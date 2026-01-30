@@ -1,0 +1,72 @@
+# Environment Variables & Secrets (CRITICAL)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+*.pem
+*.key
+*.crt
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+*.js.map
+*.d.ts.map
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Scripts folders (case-insensitive)
+Scripts/
+scripts/
+Script/
+script/
+
+# Test files with hardcoded secrets (CRITICAL)
+scripts/update-user-wallet-and-test.js
+scripts/test-backend-decrypt.js
+scripts/test-backend-encryption-key.js
+
+# Benchmarking
+benchmarking/
+.bench/
+benchmark-results.json
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# MongoDB
+*.db
+
+# OS files
+Thumbs.db
+.DS_Store

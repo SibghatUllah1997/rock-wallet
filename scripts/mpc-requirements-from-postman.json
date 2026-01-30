@@ -1,0 +1,795 @@
+{
+  "requests": [
+    {
+      "name": "✅ Success - Create Wallet",
+      "folder": "1. Create Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+      "body": "{\n    \"wallet_id\": \"{{wallet_id}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 200', function () {",
+        "    pm.response.to.have.status(200);",
+        "});",
+        "",
+        "pm.test('Response has success structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('success');",
+        "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+        "    pm.expect(jsonData.data).to.have.property('wallet_id');",
+        "    pm.expect(jsonData.data).to.have.property('wallet_key');",
+        "    pm.expect(jsonData.data).to.have.property('xpub_hash');",
+        "});",
+        "",
+        "// Save wallet_key for next requests",
+        "if (pm.response.code === 200) {",
+        "    const jsonData = pm.response.json();",
+        "    pm.environment.set('wallet_key', jsonData.data.wallet_key);",
+        "    pm.environment.set('xpub_hash', jsonData.data.xpub_hash);",
+        "    console.log('✅ Wallet created - wallet_key and xpub_hash saved');",
+        "}"
+      ],
+      "preRequestLines": [
+        "// Generate dynamic values",
+        "pm.environment.set('wallet_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+        "pm.environment.set('request_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+        "pm.environment.set('session_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+        "pm.environment.set('correlation_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+        "",
+        "// Set current date in HTTP format",
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": "Creates a new wallet with the provided wallet_id. Returns wallet_key (shard3) and xpub_hash."
+    },
+    {
+      "name": "❌ Error - Missing wallet_id",
+      "folder": "1. Create Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+      "body": "{}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has validation error', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Invalid Bearer Token",
+      "folder": "1. Create Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+      "body": "{\n    \"wallet_id\": \"{{$randomUUID}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 401', function () {",
+        "    pm.response.to.have.status(401);",
+        "});",
+        "",
+        "pm.test('Response has unauthorized error', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('UNAUTHORIZED_ACCESS_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing Header (Date)",
+      "folder": "1. Create Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+      "body": "{\n    \"wallet_id\": \"{{$randomUUID}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 412', function () {",
+        "    pm.response.to.have.status(412);",
+        "});",
+        "",
+        "pm.test('Response has header validation error', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('HEADER_VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Invalid wallet_id (empty string)",
+      "folder": "1. Create Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+      "body": "{\n  \"wallet_id\": \"\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Invalid session_id (empty)",
+      "folder": "1. Create Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+      "body": "{\n  \"wallet_id\": \"{{$randomUUID}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "✅ Success - Recover Wallet",
+      "folder": "2. Recover Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+      "body": "{\n    \"wallet_id\": \"{{wallet_id}}\",\n    \"xpub_hash\": \"{{xpub_hash}}\",\n    \"wallet_key\": \"{{wallet_key}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 200', function () {",
+        "    pm.response.to.have.status(200);",
+        "});",
+        "",
+        "pm.test('Response has success structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('success');",
+        "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+        "    pm.expect(jsonData.data).to.have.property('wallet_id');",
+        "    pm.expect(jsonData.data).to.have.property('wallet_key');",
+        "});",
+        "",
+        "// Save new wallet_key",
+        "if (pm.response.code === 200) {",
+        "    const jsonData = pm.response.json();",
+        "    pm.environment.set('wallet_key', jsonData.data.wallet_key);",
+        "    console.log('✅ Wallet recovered - new wallet_key saved');",
+        "}"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);",
+        "",
+        "// Ensure wallet_id and xpub_hash exist from create wallet",
+        "if (!pm.environment.get('wallet_id') || !pm.environment.get('xpub_hash')) {",
+        "    console.log('⚠️ Warning: Run Create Wallet first to get wallet_id and xpub_hash');",
+        "}"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Wallet Not Found",
+      "folder": "2. Recover Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+      "body": "{\n    \"wallet_id\": \"00000000-0000-0000-0000-000000000000\",\n    \"xpub_hash\": \"invalid-hash\",\n    \"wallet_key\": \"invalid-key\"\n}",
+      "testLines": [
+        "pm.test('Status code is 404', function () {",
+        "    pm.response.to.have.status(404);",
+        "});",
+        "",
+        "pm.test('Response has wallet not found error', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('WALLET_NOT_FOUND');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing wallet_id",
+      "folder": "2. Recover Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+      "body": "{\n  \"xpub_hash\": \"test-hash\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing xpub_hash",
+      "folder": "2. Recover Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+      "body": "{\n  \"wallet_id\": \"{{wallet_id}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Invalid Bearer Token",
+      "folder": "2. Recover Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+      "body": "{\n  \"wallet_id\": \"{{wallet_id}}\",\n  \"xpub_hash\": \"{{xpub_hash}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 401', function () {",
+        "    pm.response.to.have.status(401);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('UNAUTHORIZED_ACCESS_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing Header (X-RW-Client-ID)",
+      "folder": "2. Recover Wallet",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+      "body": "{\n  \"wallet_id\": \"{{wallet_id}}\",\n  \"xpub_hash\": \"{{xpub_hash}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 412', function () {",
+        "    pm.response.to.have.status(412);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('HEADER_VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "✅ Success - Generate Account XPUB",
+      "folder": "3. Generate Account XPUB",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+      "body": "{\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"accounts\": [\n        {\n            \"account_id\": \"{{$randomUUID}}\",\n            \"path\": \"m/44'/236'/0'\"\n        },\n        {\n            \"account_id\": \"{{$randomUUID}}\",\n            \"path\": \"m/44'/236'/1'\"\n        }\n    ]\n}",
+      "testLines": [
+        "pm.test('Status code is 200', function () {",
+        "    pm.response.to.have.status(200);",
+        "});",
+        "",
+        "pm.test('Response has success structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('success');",
+        "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+        "    pm.expect(jsonData.data).to.have.property('accounts');",
+        "    pm.expect(jsonData.data.accounts).to.be.an('array');",
+        "});",
+        "",
+        "// Save first account xpub for transaction signing",
+        "if (pm.response.code === 200 && pm.response.json().data.accounts.length > 0) {",
+        "    const firstAccount = pm.response.json().data.accounts[0];",
+        "    pm.environment.set('account_path', firstAccount.path);",
+        "    console.log('✅ Account XPUBs generated - account_path saved:', firstAccount.path);",
+        "}"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);",
+        "",
+        "// Ensure wallet_id and wallet_key exist",
+        "if (!pm.environment.get('wallet_id') || !pm.environment.get('wallet_key')) {",
+        "    console.log('⚠️ Warning: Run Create Wallet first');",
+        "}"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing wallet_key",
+      "folder": "3. Generate Account XPUB",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+      "body": "{\n    \"accounts\": [\n        {\n            \"account_id\": \"{{$randomUUID}}\",\n            \"path\": \"m/44'/236'/0'\"\n        }\n    ]\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has validation error', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Invalid Path Format",
+      "folder": "3. Generate Account XPUB",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+      "body": "{\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"accounts\": [\n        {\n            \"account_id\": \"{{$randomUUID}}\",\n            \"path\": \"invalid-path\"\n        }\n    ]\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has validation error', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "✅ Success - Generate Account XPUB (BTC)",
+      "folder": "3. Generate Account XPUB",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+      "body": "{\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"accounts\": [\n    {\n      \"account_id\": \"{{$randomUUID}}\",\n      \"path\": \"m/44'/0'/0'\"\n    }\n  ]\n}",
+      "testLines": [
+        "pm.test('Status code is 200', function () {",
+        "    pm.response.to.have.status(200);",
+        "});",
+        "",
+        "pm.test('Response has success structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('success');",
+        "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "✅ Success - Generate Account XPUB (Ethereum)",
+      "folder": "3. Generate Account XPUB",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+      "body": "{\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"accounts\": [\n    {\n      \"account_id\": \"{{$randomUUID}}\",\n      \"path\": \"m/44'/60'/0'\"\n    }\n  ]\n}",
+      "testLines": [
+        "pm.test('Status code is 200', function () {",
+        "    pm.response.to.have.status(200);",
+        "});",
+        "",
+        "pm.test('Response has success structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('success');",
+        "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing accounts array",
+      "folder": "3. Generate Account XPUB",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+      "body": "{\n  \"wallet_key\": \"{{wallet_key}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Wallet Not Found",
+      "folder": "3. Generate Account XPUB",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/00000000-0000-0000-0000-000000000000/accounts/xpub",
+      "body": "{\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"accounts\": [\n    {\n      \"account_id\": \"{{$randomUUID}}\",\n      \"path\": \"m/44'/236'/0'\"\n    }\n  ]\n}",
+      "testLines": [
+        "pm.test('Status code is 404', function () {",
+        "    pm.response.to.have.status(404);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('WALLET_NOT_FOUND');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "✅ Success - Sign Transaction (UTXO)",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n    \"tx_id\": \"{{tx_id}}\",\n    \"tx_data\": \"0200000002cd7b455fc5d79ecb9088f1428c9591e853a2d29305dfc5518f1c098f6a1bd7320000000000ffffffffbe1f881f9648119e15e26b96001ff66ff9660277b6420518f0d321752826aba30000000000ffffffff0240420f00000000001976a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888acb48e1400000000001976a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888ac00000000\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 1000,\n    \"account_path\": \"{{account_path...",
+      "testLines": [
+        "pm.test('Status code is 200', function () {",
+        "    pm.response.to.have.status(200);",
+        "});",
+        "",
+        "pm.test('Response has success structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('success');",
+        "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+        "    pm.expect(jsonData.data).to.have.property('tx_id');",
+        "    pm.expect(jsonData.data).to.have.property('tx_data');",
+        "});",
+        "",
+        "console.log('✅ Transaction signed successfully');"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);",
+        "",
+        "// Generate tx_id if not exists",
+        "if (!pm.environment.get('tx_id')) {",
+        "    pm.environment.set('tx_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+        "}",
+        "",
+        "// Ensure prerequisites exist",
+        "if (!pm.environment.get('wallet_id') || !pm.environment.get('wallet_key') || !pm.environment.get('account_path')) {",
+        "    console.log('⚠️ Warning: Run Create Wallet and Generate Account XPUB first');",
+        "}"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing tx_data",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n    \"tx_id\": \"{{$randomUUID}}\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 1000,\n    \"account_path\": \"m/44'/236'/0'\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has validation error', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Invalid blockchain_type",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n    \"tx_id\": \"{{$randomUUID}}\",\n    \"tx_data\": \"01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a01000000434104b5abd412d4341b92e3eeb25f56a2b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3bac00000000\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"INVALID_TYPE\",\n    \"network_fee\": 1000,\n    \"account_path\": \"m/44'/236'/0'\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has validation error', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "✅ Success - Sign Transaction (ACCOUNT_BASED - Ethereum)",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0x01ec820100808504a817c8008252089486702b14f974c96d531ce43017a95c5043ec0c61872386f26fc1000080c0\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"ACCOUNT_BASED\",\n  \"network_fee\": 20000000000,\n  \"account_path\": \"m/44'/60'/0'\",\n  \"account_chain_details\": {\n    \"address\": \"0x73FC379526e58B96E8308e6eD4F9a1efd6d2E761\",\n    \"address_path\": \"0/0\",\n    \"chain_id\": 56\n  }\n}",
+      "testLines": [
+        "pm.test('Status code is 200', function () {",
+        "    pm.response.to.have.status(200);",
+        "});",
+        "",
+        "pm.test('Response has success structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('success');",
+        "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+        "    pm.expect(jsonData.msg).to.eql('transation signed successfully');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing tx_id",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing wallet_key",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing account_path",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"utxos\": []\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing utxos (UTXO_BASED)",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing account_chain_details (ACCOUNT_BASED)",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"{\\\"to\\\":\\\"0x742d35Cc6634C0532925a3b844Bc9e7595f0bE0\\\",\\\"value\\\":\\\"0x2386f26fc10000\\\"}\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"ACCOUNT_BASED\",\n  \"network_fee\": 20000000000,\n  \"account_path\": \"m/44'/60'/0'\"\n}",
+      "testLines": [
+        "pm.test('Status code is 400', function () {",
+        "    pm.response.to.have.status(400);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Wallet Not Found",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/00000000-0000-0000-0000-000000000000/transactions/sign",
+      "body": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+      "testLines": [
+        "pm.test('Status code is 404', function () {",
+        "    pm.response.to.have.status(404);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('WALLET_NOT_FOUND');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Invalid Bearer Token",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+      "testLines": [
+        "pm.test('Status code is 401', function () {",
+        "    pm.response.to.have.status(401);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('UNAUTHORIZED_ACCESS_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    },
+    {
+      "name": "❌ Error - Missing Header (X-RW-Session-ID)",
+      "folder": "4. Sign Transaction",
+      "method": "POST",
+      "url": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+      "body": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+      "testLines": [
+        "pm.test('Status code is 412', function () {",
+        "    pm.response.to.have.status(412);",
+        "});",
+        "",
+        "pm.test('Response has correct error structure', function () {",
+        "    const jsonData = pm.response.json();",
+        "    pm.expect(jsonData.result).to.eql('error');",
+        "    pm.expect(jsonData.code).to.eql('HEADER_VALIDATION_ERROR');",
+        "});"
+      ],
+      "preRequestLines": [
+        "const date = new Date().toUTCString();",
+        "pm.environment.set('date_header', date);"
+      ],
+      "description": ""
+    }
+  ],
+  "env": {
+    "base_url": "http://localhost:3000",
+    "mpc_token": "test-token-123",
+    "device_id": "test-device-001",
+    "client_id": "test-client-001",
+    "session_id": "test-session-001",
+    "forwarded_proto": "http",
+    "forwarded_port": "3000",
+    "forwarded_for": "127.0.0.1",
+    "user_agent": "PostmanRuntime/7.32.0",
+    "host": "localhost:3000",
+    "wallet_id": "(empty)",
+    "wallet_key": "(empty)",
+    "xpub_hash": "(empty)",
+    "account_path": "(empty)",
+    "tx_id": "(empty)",
+    "date_header": "(empty)",
+    "request_id": "(empty)",
+    "correlation_id": "(empty)"
+  }
+}

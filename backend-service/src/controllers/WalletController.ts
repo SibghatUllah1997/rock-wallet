@@ -1,0 +1,1008 @@
+import { Request, Response } from 'express';
+import * as crypto from 'crypto';
+import { ShardingService } from '../services/ShardingService';
+import { BSVService } from '../services/BSVService';
+import { EncryptionService, createEncryptionService } from '../services/EncryptionService';
+import { BSVSDK } from '../../../bsv-sdk/dist/index';
+import Wallet from '../models/Wallet';
+import Account from '../models/Account';
+import Address from '../models/Address';
+import User from '../models/User';
+
+export class WalletController {
+  private bsvService: BSVService;
+  private encryptionService: EncryptionService;
+
+  constructor() {
+    this.bsvService = new BSVService(process.env.BSV_NETWORK === 'testnet');
+    try {
+      this.encryptionService = createEncryptionService();
+    } catch (error) {
+      console.warn('EncryptionService initialization warning:', error instanceof Error ? error.message : 'Unknown error');
+      this.encryptionService = createEncryptionService('dummy-key-for-initialization');
+    }
+  }
+
+  /**
+   * Create wallet endpoint
+   * POST /api/v1/wallets/create
+   * Returns 1 shard, stores 2 shards in database
+   */
+  createWallet = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { xpub } = req.body;
+
+      // Validate required fields
+      if (!xpub) {
+        res.status(400).json({
+          result: 'error',
+          code: 'VALIDATION_ERROR',
+          msg: 'validation error',
+          errors: [{
+            code: 'REQUIRED_FIELD_MISSING_ERROR',
+            err_msg: 'xpub field is required'
+          }]
+        });
+        return;
+      }
+
+      // Generate wallet with shards
+      const walletData = ShardingService.generateWalletWithShards();
+
+      // Create wallet document
+      const wallet = new Wallet({
+        walletId: walletData.walletId,
+        xpub: walletData.xpub,
+        network: process.env.BSV_NETWORK || 'testnet',
+        shard1: walletData.shard1,
+        shard2: walletData.shard2,
+        metadata: {
+          deviceId: req.headers['x-device-id'] as string,
+          clientId: req.headers['x-client-id'] as string,
+          ipAddress: req.ip
+        }
+      });
+
+      await wallet.save();
+
+      res.status(201).json({
+        result: 'success',
+        code: 'RW_CREATED',
+        msg: 'wallet created',
+        data: {
+          wallet_id: walletData.walletId,
+          shard3: walletData.shard3, // Return only the third shard
+          xpub: walletData.xpub,
+          network: process.env.BSV_NETWORK || 'testnet'
+        }
+      });
+
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error',
+        errors: [{
+          code: 'WALLET_CREATION_ERROR',
+          err_msg: error instanceof Error ? error.message : 'Unknown error'
+        }]
+      });
+    }
+  };
+
+  /**
+   * Recover wallet endpoint
+   * POST /api/v1/wallets/recovery
+   * Uses 2 shards from database + 1 from request
+   */
+  recoverWallet = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { xpub, shard3 } = req.body;
+
+      // Validate required fields
+      if (!xpub || !shard3) {
+        res.status(400).json({
+          result: 'error',
+          code: 'VALIDATION_ERROR',
+          msg: 'validation error',
+          errors: [{
+            code: 'REQUIRED_FIELD_MISSING_ERROR',
+            err_msg: 'xpub and shard3 fields are required'
+          }]
+        });
+        return;
+      }
+
+      // Find wallet by xpub
+      const wallet = await Wallet.findOne({ xpub, isActive: true });
+      if (!wallet) {
+        res.status(404).json({
+          result: 'error',
+          code: 'WALLET_NOT_FOUND',
+          msg: 'wallet not found',
+          errors: [{
+            code: 'WALLET_NOT_FOUND_ERROR',
+            err_msg: 'wallet with provided xpub not found'
+          }]
+        });
+        return;
+      }
+
+      // Validate shard format
+      if (!ShardingService.validateShard(shard3)) {
+        res.status(400).json({
+          result: 'error',
+          code: 'VALIDATION_ERROR',
+          msg: 'validation error',
+          errors: [{
+            code: 'INVALID_SHARD_ERROR',
+            err_msg: 'invalid shard format'
+          }]
+        });
+        return;
+      }
+
+      // Recover mnemonic from shards
+      const mnemonic = ShardingService.recoverMnemonicFromShards(
+        wallet.shard1, // From database
+        shard3 // From request
+      );
+
+      // Get accounts for this wallet
+      const accounts = await Account.find({ walletId: wallet.walletId, isActive: true });
+
+      res.status(200).json({
+        result: 'success',
+        code: 'RW_SUCCESS',
+        msg: 'wallet recovery successful',
+        data: {
+          wallet_id: wallet.walletId,
+          xpub: wallet.xpub,
+          network: wallet.network,
+          accounts: accounts.map(account => ({
+            account_id: account.accountId,
+            currency_id: account.currencyId,
+            currency_code: account.currencyCode,
+            blockchain_id: account.blockchainId,
+            portfolio_id: account.portfolioId,
+            path: account.derivationPath,
+            account_index: account.accountIndex
+          }))
+        }
+      });
+
+    } catch (error) {
+      console.error('Error recovering wallet:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error',
+        errors: [{
+          code: 'WALLET_RECOVERY_ERROR',
+          err_msg: error instanceof Error ? error.message : 'Unknown error'
+        }]
+      });
+    }
+  };
+
+  /**
+   * Get wallet info
+   * GET /api/v1/wallets/{wallet_id}
+   */
+  getWallet = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { wallet_id } = req.params;
+
+      const wallet = await Wallet.findOne({ walletId: wallet_id, isActive: true });
+      if (!wallet) {
+        res.status(404).json({
+          result: 'error',
+          code: 'WALLET_NOT_FOUND',
+          msg: 'wallet not found'
+        });
+        return;
+      }
+
+      // Get accounts count
+      const accountsCount = await Account.countDocuments({ walletId: wallet_id, isActive: true });
+
+      res.status(200).json({
+        result: 'success',
+        code: 'RW_SUCCESS',
+        msg: 'success',
+        data: {
+          wallet_id: wallet.walletId,
+          xpub: wallet.xpub,
+          network: wallet.network,
+          created_at: wallet.createdAt,
+          accounts_count: accountsCount,
+          is_active: wallet.isActive
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting wallet:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error'
+      });
+    }
+  };
+
+  /**
+   * Create accounts endpoint
+   * POST /api/v1/wallets/{wallet_id}/accounts/create
+   */
+  createAccounts = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { wallet_id } = req.params;
+      const { accounts } = req.body;
+
+      // Validate wallet exists
+      const wallet = await Wallet.findOne({ walletId: wallet_id, isActive: true });
+      if (!wallet) {
+        res.status(404).json({
+          result: 'error',
+          code: 'WALLET_NOT_FOUND',
+          msg: 'wallet not found'
+        });
+        return;
+      }
+
+      console.log('Wallet found with xpub:', wallet.xpub);
+
+      // Validate accounts array
+      if (!Array.isArray(accounts) || accounts.length === 0) {
+        res.status(400).json({
+          result: 'error',
+          code: 'VALIDATION_ERROR',
+          msg: 'validation error',
+          errors: [{
+            code: 'REQUIRED_FIELD_MISSING_ERROR',
+            err_msg: 'accounts array is required'
+          }]
+        });
+        return;
+      }
+
+      // Create accounts
+      const createdAccounts = [];
+      for (let i = 0; i < accounts.length; i++) {
+        const accountData = accounts[i];
+        const accountId = `account_${Date.now()}_${i}`;
+        
+        const account = new Account({
+          accountId: accountId,
+          walletId: wallet_id,
+          currencyId: 'bsv',
+          currencyCode: 'BSV',
+          blockchainId: 'bitcoin-sv',
+          portfolioId: 'default',
+          derivationPath: `m/44'/0'/0'/${i}`,
+          accountIndex: i,
+          xpub: wallet.xpub,
+          metadata: {
+            accountName: accountData.account_name || `Account ${i + 1}`,
+            description: accountData.account_type || 'default'
+          }
+        });
+
+        console.log('Creating account with xpub:', wallet.xpub);
+        await account.save();
+        console.log('Account saved with xpub:', account.xpub);
+        createdAccounts.push({
+          account_id: accountId,
+          wallet_id: wallet_id,
+          account_name: accountData.account_name || `Account ${i + 1}`,
+          account_type: accountData.account_type || 'default',
+          created_at: account.createdAt
+        });
+      }
+
+      res.status(201).json({
+        result: 'success',
+        code: 'ACCOUNT_CREATED',
+        msg: 'account created',
+        data: {
+          accounts: createdAccounts
+        }
+      });
+
+    } catch (error) {
+      console.error('Error creating accounts:', error);
+      console.error('Error details:', error.message);
+      console.error('Error stack:', error.stack);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error',
+        error: error.message
+      });
+    }
+  };
+
+  /**
+   * Get accounts
+   * GET /api/v1/wallets/{wallet_id}/accounts
+   */
+  getAccounts = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { wallet_id } = req.params;
+
+      const accounts = await Account.find({ walletId: wallet_id, isActive: true }).select('+xpub');
+
+      res.status(200).json({
+        result: 'success',
+        code: 'RW_SUCCESS',
+        msg: 'success',
+        data: {
+          accounts: accounts.map(account => ({
+            account_id: account.accountId,
+            currency_id: account.currencyId,
+            currency_code: account.currencyCode,
+            currency_name: account.currencyCode, // You can extend this with currency names
+            currency_type: 'native', // You can extend this with currency types
+            blockchain_id: account.blockchainId,
+            blockchain_name: 'Bitcoin SV', // You can extend this with blockchain names
+            portfolio_id: account.portfolioId,
+            path: account.derivationPath,
+            account_index: account.accountIndex,
+            xpub: account.xpub,
+            created_at: account.createdAt
+          }))
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting accounts:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error'
+      });
+    }
+  };
+
+  /**
+   * Get portfolios
+   * GET /api/v1/wallets/{wallet_id}/portfolios
+   * Aggregates balances from all addresses in user's accounts
+   */
+  getPortfolios = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { wallet_id } = req.params;
+
+      // Validate wallet exists
+      const wallet = await Wallet.findOne({ walletId: wallet_id, isActive: true });
+      if (!wallet) {
+        res.status(404).json({
+          result: 'error',
+          code: 'WALLET_NOT_FOUND',
+          msg: 'wallet not found'
+        });
+        return;
+      }
+
+      // Get all addresses for this wallet
+      const addresses = await Address.find({ 
+        walletId: wallet_id, 
+        isActive: true 
+      }).populate('accountId');
+
+      // Get accounts to map account info
+      const accounts = await Account.find({ walletId: wallet_id, isActive: true });
+
+      // Aggregate balances from all addresses
+      const addressBalances = [];
+      for (const address of addresses) {
+        try {
+          const balance = await this.bsvService.getBalance(address.address);
+          
+          // Find account for this address
+          const account = accounts.find(acc => acc.accountId === address.accountId);
+          
+          addressBalances.push({
+            address_id: address.addressId,
+            address: address.address,
+            public_key: address.publicKey,
+            derivation_path: address.derivationPath,
+            address_index: address.addressIndex,
+            account_id: address.accountId,
+            account_type: account?.accountType || 'unknown',
+            account_index: account?.accountIndex,
+            portfolio_id: account?.portfolioId || 'default',
+            currency_code: address.currencyCode,
+            balance: Number(balance), // Total balance in satoshis
+            balance_bsv: (Number(balance) / 100000000).toFixed(8), // Convert to BSV
+            created_at: address.createdAt,
+            explorer_url: this.bsvService.getAddressExplorerUrl(address.address)
+          });
+        } catch (error) {
+          console.error(`Error getting balance for address ${address.address}:`, error);
+          // Continue with other addresses even if one fails
+        }
+      }
+
+      // Calculate total balance
+      const totalBalance = addressBalances.reduce((sum, addr) => sum + addr.balance, 0);
+
+      res.status(200).json({
+        result: 'success',
+        code: 'RW_SUCCESS',
+        msg: 'success',
+        data: {
+          wallet_id: wallet_id,
+          total_balance: totalBalance,
+          total_balance_bsv: (totalBalance / 100000000).toFixed(8),
+          addresses: addressBalances,
+          summary: {
+            total_addresses: addressBalances.length,
+            accounts: accounts.length
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting portfolios:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error',
+        errors: [{
+          code: 'PORTFOLIO_FETCH_ERROR',
+          err_msg: error instanceof Error ? error.message : 'Unknown error'
+        }]
+      });
+    }
+  };
+
+  /**
+   * Create accounts for specific currency
+   * POST /api/v1/wallets/{wallet_id}/accounts/create-currency
+   */
+  createAccountsForCurrency = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { wallet_id } = req.params;
+      const { currency_id, currency_code, blockchain_id, accounts } = req.body;
+
+      // Validate wallet exists
+      const wallet = await Wallet.findOne({ walletId: wallet_id, isActive: true });
+      if (!wallet) {
+        res.status(404).json({
+          result: 'error',
+          code: 'WALLET_NOT_FOUND',
+          msg: 'wallet not found'
+        });
+        return;
+      }
+
+      // Validate required fields
+      if (!currency_id || !currency_code || !blockchain_id) {
+        res.status(400).json({
+          result: 'error',
+          code: 'VALIDATION_ERROR',
+          msg: 'validation error',
+          errors: [{
+            code: 'REQUIRED_FIELD_MISSING_ERROR',
+            err_msg: 'currency_id, currency_code, and blockchain_id are required'
+          }]
+        });
+        return;
+      }
+
+      if (!Array.isArray(accounts) || accounts.length === 0) {
+        res.status(400).json({
+          result: 'error',
+          code: 'VALIDATION_ERROR',
+          msg: 'validation error',
+          errors: [{
+            code: 'REQUIRED_FIELD_MISSING_ERROR',
+            err_msg: 'accounts array is required'
+          }]
+        });
+        return;
+      }
+
+      // Get next account index for this currency
+      const existingAccounts = await Account.find({ 
+        walletId: wallet_id, 
+        currencyId: currency_id,
+        isActive: true 
+      });
+      const startIndex = existingAccounts.length;
+
+      // Create accounts
+      const createdAccounts = [];
+      for (let i = 0; i < accounts.length; i++) {
+        const accountData = accounts[i];
+        const accountId = `account_${Date.now()}_${currency_id}_${i}`;
+        const accountIndex = startIndex + i;
+        
+        const account = new Account({
+          accountId: accountId,
+          walletId: wallet_id,
+          currencyId: currency_id,
+          currencyCode: currency_code,
+          blockchainId: blockchain_id,
+          portfolioId: accountData.portfolio_id || 'default',
+          derivationPath: `m/44'/0'/0'/${accountIndex}`,
+          accountIndex: accountIndex,
+          xpub: wallet.xpub,
+          metadata: {
+            accountName: accountData.account_name || `${currency_code} Account ${accountIndex + 1}`,
+            description: accountData.account_type || 'default'
+          }
+        });
+
+        await account.save();
+        createdAccounts.push({
+          account_id: accountId,
+          wallet_id: wallet_id,
+          currency_id: currency_id,
+          currency_code: currency_code,
+          account_name: accountData.account_name || `${currency_code} Account ${accountIndex + 1}`,
+          account_type: accountData.account_type || 'default',
+          created_at: account.createdAt
+        });
+      }
+
+      res.status(201).json({
+        result: 'success',
+        code: 'ACCOUNT_CREATED',
+        msg: 'accounts created',
+        data: {
+          accounts: createdAccounts
+        }
+      });
+
+    } catch (error) {
+      console.error('Error creating accounts for currency:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  };
+
+  /**
+   * Get accounts by currency
+   * GET /api/v1/wallets/{wallet_id}/accounts/by-currency
+   */
+  getAccountsByCurrency = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { wallet_id } = req.params;
+      const { currency_id } = req.query;
+
+      // Validate wallet exists
+      const wallet = await Wallet.findOne({ walletId: wallet_id, isActive: true });
+      if (!wallet) {
+        res.status(404).json({
+          result: 'error',
+          code: 'WALLET_NOT_FOUND',
+          msg: 'wallet not found'
+        });
+        return;
+      }
+
+      // Build query
+      const query: any = { walletId: wallet_id, isActive: true };
+      if (currency_id) {
+        query.currencyId = currency_id as string;
+      }
+
+      const accounts = await Account.find(query).select('+xpub');
+
+      // Group by currency
+      const groupedAccounts: Record<string, any[]> = {};
+      accounts.forEach(account => {
+        if (!groupedAccounts[account.currencyId]) {
+          groupedAccounts[account.currencyId] = [];
+        }
+        groupedAccounts[account.currencyId].push({
+          account_id: account.accountId,
+          currency_id: account.currencyId,
+          currency_code: account.currencyCode,
+          blockchain_id: account.blockchainId,
+          portfolio_id: account.portfolioId,
+          path: account.derivationPath,
+          account_index: account.accountIndex,
+          xpub: account.xpub,
+          account_name: account.metadata?.accountName,
+          created_at: account.createdAt
+        });
+      });
+
+      res.status(200).json({
+        result: 'success',
+        code: 'RW_SUCCESS',
+        msg: 'success',
+        data: {
+          accounts_by_currency: groupedAccounts
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting accounts by currency:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error'
+      });
+    }
+  };
+
+  /**
+   * Update account name
+   * PUT /api/v1/wallets/{wallet_id}/accounts/{account_id}/name
+   */
+  updateAccountName = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { wallet_id, account_id } = req.params;
+      const { account_name } = req.body;
+
+      // Validate required fields
+      if (!account_name) {
+        res.status(400).json({
+          result: 'error',
+          code: 'VALIDATION_ERROR',
+          msg: 'validation error',
+          errors: [{
+            code: 'REQUIRED_FIELD_MISSING_ERROR',
+            err_msg: 'account_name is required'
+          }]
+        });
+        return;
+      }
+
+      // Validate wallet exists
+      const wallet = await Wallet.findOne({ walletId: wallet_id, isActive: true });
+      if (!wallet) {
+        res.status(404).json({
+          result: 'error',
+          code: 'WALLET_NOT_FOUND',
+          msg: 'wallet not found'
+        });
+        return;
+      }
+
+      // Find and update account
+      const account = await Account.findOne({ 
+        accountId: account_id, 
+        walletId: wallet_id, 
+        isActive: true 
+      });
+
+      if (!account) {
+        res.status(404).json({
+          result: 'error',
+          code: 'ACCOUNT_NOT_FOUND',
+          msg: 'account not found'
+        });
+        return;
+      }
+
+      account.metadata = account.metadata || {};
+      account.metadata.accountName = account_name;
+      await account.save();
+
+      res.status(200).json({
+        result: 'success',
+        code: 'RW_SUCCESS',
+        msg: 'account name updated',
+        data: {
+          account_id: account.accountId,
+          account_name: account_name,
+          updated_at: account.updatedAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Error updating account name:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error'
+      });
+    }
+  };
+
+  /**
+   * Get account details
+   * GET /api/v1/wallets/{wallet_id}/accounts/{account_id}
+   */
+  getAccountDetails = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { wallet_id, account_id } = req.params;
+
+      // Validate wallet exists
+      const wallet = await Wallet.findOne({ walletId: wallet_id, isActive: true });
+      if (!wallet) {
+        res.status(404).json({
+          result: 'error',
+          code: 'WALLET_NOT_FOUND',
+          msg: 'wallet not found'
+        });
+        return;
+      }
+
+      // Find account
+      const account = await Account.findOne({ 
+        accountId: account_id, 
+        walletId: wallet_id, 
+        isActive: true 
+      }).select('+xpub');
+
+      if (!account) {
+        res.status(404).json({
+          result: 'error',
+          code: 'ACCOUNT_NOT_FOUND',
+          msg: 'account not found'
+        });
+        return;
+      }
+
+      // Get addresses for this account
+      const addresses = await Address.find({ 
+        accountId: account_id, 
+        isActive: true 
+      });
+
+      res.status(200).json({
+        result: 'success',
+        code: 'RW_SUCCESS',
+        msg: 'success',
+        data: {
+          account_id: account.accountId,
+          wallet_id: account.walletId,
+          currency_id: account.currencyId,
+          currency_code: account.currencyCode,
+          blockchain_id: account.blockchainId,
+          portfolio_id: account.portfolioId,
+          derivation_path: account.derivationPath,
+          account_index: account.accountIndex,
+          xpub: account.xpub,
+          account_name: account.metadata?.accountName,
+          account_type: account.metadata?.description,
+          addresses_count: addresses.length,
+          created_at: account.createdAt,
+          updated_at: account.updatedAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting account details:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error'
+      });
+    }
+  };
+
+  /**
+   * Get portfolios (User-based)
+   * POST /api/v1/users/portfolios
+   * Aggregates balances from all accounts for authenticated user
+   */
+  getPortfoliosForUser = async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Get user from JWT (set by authenticateJWT middleware)
+      if (!req.user) {
+        res.status(401).json({
+          result: 'error',
+          code: 'UNAUTHORIZED',
+          msg: 'authentication required'
+        });
+        return;
+      }
+
+      // Find user from JWT data
+      const user = await User.findOne({
+        userId: req.user.userId,
+        isActive: true
+      });
+
+      if (!user) {
+        res.status(404).json({
+          result: 'error',
+          code: 'USER_NOT_FOUND',
+          msg: 'user not found'
+        });
+        return;
+      }
+
+      // Use user's network to create correct BSVService instance
+      const isTestnet = user.network !== 'mainnet';
+      const bsvService = new BSVService(isTestnet);
+      
+      const addressBalances = [];
+      for (const account of user.accounts) {
+        try {
+          const address = account.address.address;
+          const balance = await bsvService.getBalance(address);
+          
+          addressBalances.push({
+            address: address,
+            public_key: account.address.publicKey,
+            derivation_path: account.address.derivationPath,
+            address_index: account.address.addressIndex,
+            account_id: account.accountId,
+            account_type: account.accountType,
+            account_index: account.accountIndex,
+            portfolio_id: 'default',
+            currency_code: 'BSV',
+            balance: {
+              confirmed: balance.native.confirmed,
+              confirmed_bsv: (balance.native.confirmed / 100000000).toFixed(8),
+              utxos: balance.native.utxos
+            },
+            created_at: account.createdAt,
+            explorer_url: bsvService.getAddressExplorerUrl(address)
+          });
+        } catch (error) {
+          console.error(`Error getting balance for account ${account.accountId}:`, error);
+        }
+      }
+
+      // Calculate total confirmed balance only
+      const totalBalance = addressBalances.reduce((sum, addr) => sum + (typeof addr.balance === 'object' ? addr.balance.confirmed : Number(addr.balance) || 0), 0);
+
+      res.status(200).json({
+        result: 'success',
+        code: 'RW_SUCCESS',
+        msg: 'success',
+        data: {
+          user_id: user.userId,
+          wallet_id: user.walletId,
+          network: user.network,
+          total_balance: totalBalance,
+          total_balance_bsv: (totalBalance / 100000000).toFixed(8),
+          addresses: addressBalances,
+          summary: {
+            total_addresses: addressBalances.length,
+            accounts: user.accounts.length
+          },
+          note: 'Only confirmed balances are included'
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting portfolios:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error',
+        errors: [{
+          code: 'PORTFOLIO_FETCH_ERROR',
+          err_msg: error instanceof Error ? error.message : 'Unknown error'
+        }]
+      });
+    }
+  };
+
+  /**
+   * Create new account for user
+   * POST /api/v1/users/accounts/create
+   * Creates a new account by reading the last created account index and creating the next one
+   */
+  createAccountForUser = async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Get user from JWT (set by authenticateJWT middleware)
+      if (!req.user) {
+        res.status(401).json({
+          result: 'error',
+          code: 'UNAUTHORIZED',
+          msg: 'authentication required'
+        });
+        return;
+      }
+
+      // Find user from JWT data
+      const user = await User.findOne({
+        userId: req.user.userId,
+        isActive: true
+      });
+
+      if (!user) {
+        res.status(404).json({
+          result: 'error',
+          code: 'USER_NOT_FOUND',
+          msg: 'user not found'
+        });
+        return;
+      }
+
+      // Decrypt shards from database to recover mnemonic
+      const decryptedShard1 = this.encryptionService.decryptShard(user.shard1);
+      const decryptedShard2 = this.encryptionService.decryptShard(user.shard2);
+
+      // Recover mnemonic using 2 decrypted shards from DB
+      const mnemonic = ShardingService.recoverMnemonicFromShards(
+        decryptedShard1,
+        decryptedShard2
+      );
+
+      // Find the maximum accountIndex from existing accounts
+      const maxAccountIndex = user.accounts.length > 0
+        ? Math.max(...user.accounts.map(acc => acc.accountIndex))
+        : -1;
+
+      // Calculate next account index
+      const newAccountIndex = maxAccountIndex + 1;
+
+      // Determine account type based on index (alternating between saving and current)
+      // Even indices: saving, Odd indices: current
+      const accountType: 'saving' | 'current' = newAccountIndex % 2 === 0 ? 'saving' : 'current';
+
+      // Use user's network to create correct SDK instance
+      const isTestnet = user.network !== 'mainnet';
+      const sdk = new BSVSDK({ isTestnet, maxAddresses: 100000, feeRate: 5 });
+
+      // Generate xpub for new account
+      const newXpubData = sdk.generateXPub(mnemonic, newAccountIndex);
+      
+      // Derive address from the new account xpub
+      const newAddressData = sdk.deriveAddressFromXPub(newXpubData.xpub, 0, 0, 'p2pkh');
+
+      // Create new account object
+      const newAccount = {
+        accountId: crypto.randomUUID(),
+        accountType: accountType,
+        accountIndex: newAccountIndex,
+        xpub: newXpubData.xpub,
+        derivationPath: newXpubData.derivationPath,
+        address: {
+          address: newAddressData.address,
+          publicKey: newAddressData.publicKey,
+          derivationPath: newAddressData.derivationPath,
+          addressIndex: 0
+        },
+        createdAt: new Date()
+      };
+
+      // Add new account to user's accounts array
+      user.accounts.push(newAccount);
+      
+      // Save user with new account
+      await user.save();
+
+      // Return response
+      res.status(201).json({
+        result: 'success',
+        code: 'RW_CREATED',
+        msg: 'account created successfully',
+        data: {
+          account_id: newAccount.accountId,
+          account_type: newAccount.accountType,
+          account_index: newAccount.accountIndex,
+          xpub: newAccount.xpub,
+          derivation_path: newAccount.derivationPath,
+          address: {
+            address: newAccount.address.address,
+            public_key: newAccount.address.publicKey,
+            derivation_path: newAccount.address.derivationPath,
+            address_index: newAccount.address.addressIndex
+          },
+          created_at: newAccount.createdAt,
+          total_accounts: user.accounts.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error creating account:', error);
+      res.status(500).json({
+        result: 'error',
+        code: 'INTERNAL_ERROR',
+        msg: 'internal server error',
+        errors: [{
+          code: 'ACCOUNT_CREATION_ERROR',
+          err_msg: error instanceof Error ? error.message : 'Unknown error'
+        }]
+      });
+    }
+  };
+}

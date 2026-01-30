@@ -1,0 +1,4354 @@
+{
+  "info": {
+    "_postman_id": "ac5ae38c-cb11-47ba-8b6c-835aa1067481",
+    "name": "MPC Wallet APIs - Complete Test Suite (All Scenarios)",
+    "description": "Complete collection for testing ALL MPC Wallet APIs with ALL success and error scenarios as per requirement document. Includes: Success (200), Validation Errors (400), Unauthorized (401), Not Found (404), Header Validation (412), Database Errors (500). Total: 31 test scenarios.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "14979114"
+  },
+  "item": [
+    {
+      "name": "1. Create Wallet",
+      "item": [
+        {
+          "name": "✅ Success - Create Wallet",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate dynamic values",
+                  "pm.environment.set('wallet_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+                  "pm.environment.set('request_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+                  "pm.environment.set('session_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+                  "pm.environment.set('correlation_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+                  "",
+                  "// Set current date in HTTP format",
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+                  "    pm.expect(jsonData.data).to.have.property('wallet_id');",
+                  "    pm.expect(jsonData.data).to.have.property('wallet_key');",
+                  "    pm.expect(jsonData.data).to.have.property('xpub_hash');",
+                  "});",
+                  "",
+                  "// Save wallet_key for next requests",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('wallet_key', jsonData.data.wallet_key);",
+                  "    pm.environment.set('xpub_hash', jsonData.data.xpub_hash);",
+                  "    console.log('✅ Wallet created - wallet_key and xpub_hash saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{request_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{correlation_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"wallet_id\": \"{{wallet_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "create"
+              ]
+            },
+            "description": "Creates a new wallet with the provided wallet_id. Returns wallet_key (shard3) and xpub_hash."
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing wallet_id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Invalid Bearer Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Response has unauthorized error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('UNAUTHORIZED_ACCESS_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer invalid-token-123",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"wallet_id\": \"{{$randomUUID}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing Header (Date)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 412', function () {",
+                  "    pm.response.to.have.status(412);",
+                  "});",
+                  "",
+                  "pm.test('Response has header validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('HEADER_VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"wallet_id\": \"{{$randomUUID}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Invalid wallet_id (empty string)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Invalid session_id (empty)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": \"{{$randomUUID}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/create",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Wallet creation endpoint"
+    },
+    {
+      "name": "2. Recover Wallet",
+      "item": [
+        {
+          "name": "✅ Success - Recover Wallet",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);",
+                  "",
+                  "// Ensure wallet_id and xpub_hash exist from create wallet",
+                  "if (!pm.environment.get('wallet_id') || !pm.environment.get('xpub_hash')) {",
+                  "    console.log('⚠️ Warning: Run Create Wallet first to get wallet_id and xpub_hash');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+                  "    pm.expect(jsonData.data).to.have.property('wallet_id');",
+                  "    pm.expect(jsonData.data).to.have.property('wallet_key');",
+                  "});",
+                  "",
+                  "// Save new wallet_key",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('wallet_key', jsonData.data.wallet_key);",
+                  "    console.log('✅ Wallet recovered - new wallet_key saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"wallet_id\": \"{{wallet_id}}\",\n    \"xpub_hash\": \"{{xpub_hash}}\",\n    \"wallet_key\": \"{{wallet_key}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "recovery"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Wallet Not Found",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Response has wallet not found error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('WALLET_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"wallet_id\": \"00000000-0000-0000-0000-000000000000\",\n    \"xpub_hash\": \"invalid-hash\",\n    \"wallet_key\": \"invalid-key\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "recovery"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing wallet_id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"xpub_hash\": \"test-hash\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "recovery"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing xpub_hash",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": \"{{wallet_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "recovery"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Invalid Bearer Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('UNAUTHORIZED_ACCESS_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer invalid-token",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": \"{{wallet_id}}\",\n  \"xpub_hash\": \"{{xpub_hash}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "recovery"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing Header (X-RW-Client-ID)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 412', function () {",
+                  "    pm.response.to.have.status(412);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('HEADER_VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": \"{{wallet_id}}\",\n  \"xpub_hash\": \"{{xpub_hash}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/recovery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "recovery"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Wallet recovery endpoint"
+    },
+    {
+      "name": "3. Generate Account XPUB",
+      "item": [
+        {
+          "name": "✅ Success - Generate Account XPUB",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);",
+                  "",
+                  "// Ensure wallet_id and wallet_key exist",
+                  "if (!pm.environment.get('wallet_id') || !pm.environment.get('wallet_key')) {",
+                  "    console.log('⚠️ Warning: Run Create Wallet first');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+                  "    pm.expect(jsonData.data).to.have.property('accounts');",
+                  "    pm.expect(jsonData.data.accounts).to.be.an('array');",
+                  "});",
+                  "",
+                  "// Save first account xpub for transaction signing",
+                  "if (pm.response.code === 200 && pm.response.json().data.accounts.length > 0) {",
+                  "    const firstAccount = pm.response.json().data.accounts[0];",
+                  "    pm.environment.set('account_path', firstAccount.path);",
+                  "    console.log('✅ Account XPUBs generated - account_path saved:', firstAccount.path);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"accounts\": [\n        {\n            \"account_id\": \"{{$randomUUID}}\",\n            \"path\": \"m/44'/236'/0'\"\n        },\n        {\n            \"account_id\": \"{{$randomUUID}}\",\n            \"path\": \"m/44'/236'/1'\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "accounts",
+                "xpub"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing wallet_key",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"accounts\": [\n        {\n            \"account_id\": \"{{$randomUUID}}\",\n            \"path\": \"m/44'/236'/0'\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "accounts",
+                "xpub"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Invalid Path Format",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"accounts\": [\n        {\n            \"account_id\": \"{{$randomUUID}}\",\n            \"path\": \"invalid-path\"\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "accounts",
+                "xpub"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Success - Generate Account XPUB (BTC)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"accounts\": [\n    {\n      \"account_id\": \"{{$randomUUID}}\",\n      \"path\": \"m/44'/0'/0'\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "accounts",
+                "xpub"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Success - Generate Account XPUB (Ethereum)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"accounts\": [\n    {\n      \"account_id\": \"{{$randomUUID}}\",\n      \"path\": \"m/44'/60'/0'\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "accounts",
+                "xpub"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing accounts array",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_key\": \"{{wallet_key}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/accounts/xpub",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "accounts",
+                "xpub"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Wallet Not Found",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('WALLET_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"accounts\": [\n    {\n      \"account_id\": \"{{$randomUUID}}\",\n      \"path\": \"m/44'/236'/0'\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/00000000-0000-0000-0000-000000000000/accounts/xpub",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "00000000-0000-0000-0000-000000000000",
+                "accounts",
+                "xpub"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Generate account XPUB endpoint"
+    },
+    {
+      "name": "4. Sign Transaction",
+      "item": [
+        {
+          "name": "✅ Success - Sign Transaction (UTXO)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);",
+                  "",
+                  "// Generate tx_id if not exists",
+                  "if (!pm.environment.get('tx_id')) {",
+                  "    pm.environment.set('tx_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+                  "}",
+                  "",
+                  "// Ensure prerequisites exist",
+                  "if (!pm.environment.get('wallet_id') || !pm.environment.get('wallet_key') || !pm.environment.get('account_path')) {",
+                  "    console.log('⚠️ Warning: Run Create Wallet and Generate Account XPUB first');",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+                  "    pm.expect(jsonData.data).to.have.property('tx_id');",
+                  "    pm.expect(jsonData.data).to.have.property('tx_data');",
+                  "});",
+                  "",
+                  "console.log('✅ Transaction signed successfully');"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tx_id\": \"{{tx_id}}\",\n    \"tx_data\": \"0200000002cd7b455fc5d79ecb9088f1428c9591e853a2d29305dfc5518f1c098f6a1bd7320000000000ffffffffbe1f881f9648119e15e26b96001ff66ff9660277b6420518f0d321752826aba30000000000ffffffff0240420f00000000001976a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888acb48e1400000000001976a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888ac00000000\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 1000,\n    \"account_path\": \"{{account_path}}\",\n    \"utxos\": [\n      {\n      \"tx_hash\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"vout\": 0,\n      \"script_pub_key_hex\": \"76a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba88ac\",\n      \"value\": 23151167,\n      \"address_path\": \"0/0\"\n    }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing tx_data",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tx_id\": \"{{$randomUUID}}\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 1000,\n    \"account_path\": \"m/44'/236'/0'\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Invalid blockchain_type",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tx_id\": \"{{$randomUUID}}\",\n    \"tx_data\": \"01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020602ffffffff0100f2052a01000000434104b5abd412d4341b92e3eeb25f56a2b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3bac00000000\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"INVALID_TYPE\",\n    \"network_fee\": 1000,\n    \"account_path\": \"m/44'/236'/0'\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Success - Sign Transaction (ACCOUNT_BASED - Ethereum)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.code).to.eql('RW_SUCCESS');",
+                  "    pm.expect(jsonData.msg).to.eql('transation signed successfully');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0x01ec820100808504a817c8008252089486702b14f974c96d531ce43017a95c5043ec0c61872386f26fc1000080c0\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"ACCOUNT_BASED\",\n  \"network_fee\": 20000000000,\n  \"account_path\": \"m/44'/60'/0'\",\n  \"account_chain_details\": {\n    \"address\": \"0x73FC379526e58B96E8308e6eD4F9a1efd6d2E761\",\n    \"address_path\": \"0/0\",\n    \"chain_id\": 56\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing tx_id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing wallet_key",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing account_path",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"utxos\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing utxos (UTXO_BASED)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing account_chain_details (ACCOUNT_BASED)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"{\\\"to\\\":\\\"0x742d35Cc6634C0532925a3b844Bc9e7595f0bE0\\\",\\\"value\\\":\\\"0x2386f26fc10000\\\"}\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"ACCOUNT_BASED\",\n  \"network_fee\": 20000000000,\n  \"account_path\": \"m/44'/60'/0'\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Wallet Not Found",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('WALLET_NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/00000000-0000-0000-0000-000000000000/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "00000000-0000-0000-0000-000000000000",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Invalid Bearer Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('UNAUTHORIZED_ACCESS_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer invalid-token",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Session-ID",
+                "value": "{{session_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Error - Missing Header (X-RW-Session-ID)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 412', function () {",
+                  "    pm.response.to.have.status(412);",
+                  "});",
+                  "",
+                  "pm.test('Response has correct error structure', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('error');",
+                  "    pm.expect(jsonData.code).to.eql('HEADER_VALIDATION_ERROR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mpc_token}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Device-ID",
+                "value": "{{device_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Client-ID",
+                "value": "{{client_id}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Request-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Correlation-ID",
+                "value": "{{$randomUUID}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Proto",
+                "value": "{{forwarded_proto}}",
+                "type": "text"
+              },
+              {
+                "key": "X-RW-Forwarded-Port",
+                "value": "{{forwarded_port}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{forwarded_for}}",
+                "type": "text"
+              },
+              {
+                "key": "User-Agent",
+                "value": "{{user_agent}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Connection",
+                "value": "keep-alive",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Host",
+                "value": "{{host}}",
+                "type": "text"
+              },
+              {
+                "key": "Date",
+                "value": "{{date_header}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tx_id\": \"{{$randomUUID}}\",\n  \"tx_data\": \"0100000001...\",\n  \"wallet_key\": \"{{wallet_key}}\",\n  \"blockchain_type\": \"UTXO_BASED\",\n  \"network_fee\": 1000,\n  \"account_path\": \"{{account_path}}\",\n  \"utxos\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "rwcore",
+                "api",
+                "v1",
+                "mpc",
+                "wallets",
+                "{{wallet_id}}",
+                "transactions",
+                "sign"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Sign transaction endpoint"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script - sets Date header for all requests",
+          "const date = new Date().toUTCString();",
+          "pm.environment.set('date_header', date);"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+}
