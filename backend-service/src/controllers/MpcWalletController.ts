@@ -4,7 +4,20 @@ import Wallet from '../models/Wallet';
 import { ShardingService } from '../services/ShardingService';
 import { EncryptionService, createEncryptionService } from '../services/EncryptionService';
 // All blockchain operations are in SDK - no direct @bsv/sdk or axios usage for blockchain calls
-import { BSVSDK, EthereumKeyPairManager, EthereumTransactionSigner, BitcoinTransactionSigner, BSVTransactionSigner } from '../../../bsv-sdk/dist/index';
+import { BSVSDK, EthereumKeyPairManager, EthereumTransactionSigner, BitcoinTransactionSigner, BSVTransactionSigner, detectTxType, isAllowedProtocol, getLockingScriptType } from '../../../bsv-sdk/dist/index';
+import { LockingScript } from '@bsv/sdk';
+
+// MNEE: transfer() creates cosigned tx; submitRawTx adds cosigner for pre-built tx.
+let MneeClass: new (config: { environment: string; apiKey?: string }) => {
+  transfer: (recipients: Array<{ address: string; amount: number }>, wif: string, opts?: { broadcast?: boolean }) => Promise<{ rawtx?: string; rawTx?: string }>;
+  submitRawTx: (hex: string, opts?: { broadcast?: boolean }) => Promise<{ rawtx?: string; rawTx?: string; ticketId?: string }>;
+};
+try {
+  const mneeModule = require('@mnee/ts-sdk');
+  MneeClass = typeof mneeModule.default === 'function' ? mneeModule.default : mneeModule;
+} catch {
+  MneeClass = null as any;
+}
 
 export class MpcWalletController {
   private encryptionService: EncryptionService;
@@ -394,13 +407,18 @@ export class MpcWalletController {
 
         const coinType = Number(match[1]);
         const accountIndex = Number(match[2]);
-        
-        // Allow BSV coin types (1/236), Bitcoin (0), and Ethereum coin type (60)
-        // This enables the same wallet to support multiple UTXO_BASED and ACCOUNT_BASED blockchains
-        // Per requirement document: BSV (236/1), BTC (0), Ethereum (60)
-        const isValidCoinType = !Number.isNaN(coinType) && (coinType === expectedCoinType || coinType === 0 || coinType === 60);
+        const btcTestnetEnabled = process.env.BTCTESTNET === 'true';
+
+        // Allow BSV coin types (1/236), Bitcoin (0), optionally BTC testnet (1) when BTCTESTNET=true, and Ethereum (60)
+        // MPC only: when BTCTESTNET=true support BTC testnet (coin type 1); otherwise mainnet only
+        const allowBtcTestnetCoinType = coinType === 1 && (expectedCoinType === 1 || btcTestnetEnabled);
+        const isValidCoinType = !Number.isNaN(coinType) && (coinType === expectedCoinType || coinType === 0 || coinType === 60 || allowBtcTestnetCoinType);
         const isValidAccountIndex = !Number.isNaN(accountIndex) && accountIndex >= 0;
-        
+
+        const supportedCoinTypesDesc = btcTestnetEnabled
+          ? `${expectedCoinType} (BSV), 0 (Bitcoin/BTC mainnet), 1 (BTC testnet), or 60 (Ethereum/EVM)`
+          : `${expectedCoinType} (BSV), 0 (Bitcoin/BTC), or 60 (Ethereum/EVM)`;
+
         if (!isValidCoinType || !isValidAccountIndex) {
           res.status(400).json({
             result: 'error',
@@ -408,7 +426,7 @@ export class MpcWalletController {
             msg: 'validation error',
             errors: [{
               code: 'INVALID_INPUT_ERROR',
-              err_msg: `derivation path coin type or account index is invalid for account_id ${account.account_id}. Supported coin types: ${expectedCoinType} (BSV), 0 (Bitcoin/BTC), or 60 (Ethereum/EVM)`
+              err_msg: `derivation path coin type or account index is invalid for account_id ${account.account_id}. Supported coin types: ${supportedCoinTypesDesc}`
             }]
           });
           return;
@@ -475,7 +493,11 @@ export class MpcWalletController {
         blockchain_type,
         network_fee,
         account_path,
-        utxos
+        utxos,
+        mnee_recipients,
+        tx_type: requestedTxType,
+        sign_outputs: signOutputsReq,
+        anyone_can_pay: anyoneCanPayReq
       } = req.body;
 
       if (!wallet_id || typeof wallet_id !== 'string' || !wallet_id.trim()) {
@@ -504,24 +526,26 @@ export class MpcWalletController {
         return;
       }
 
-      // tx_data validation - must be a string (hex for UTXO, JSON string for ACCOUNT_BASED)
-      if (!tx_data) {
+      // tx_data validation - must be a string (hex for UTXO, JSON string for ACCOUNT_BASED). Optional when mnee_recipients is used (MNEE create-and-hold flow).
+      const useMneeTransfer = blockchain_type === 'UTXO_BASED' && Array.isArray(mnee_recipients) && mnee_recipients.length > 0 &&
+        mnee_recipients.every((r: any) => r && typeof r.address === 'string' && r.address.trim() && typeof r.amount === 'number' && r.amount > 0);
+      if (!tx_data && !useMneeTransfer) {
         res.status(400).json({
           result: 'error',
           code: 'VALIDATION_ERROR',
           msg: 'validation error',
           errors: [{
             code: 'REQUIRED_FIELD_MISSING_ERROR',
-            err_msg: 'tx_data field is required'
+            err_msg: 'tx_data field is required (or use mnee_recipients for MNEE create-and-hold)'
           }]
         });
         return;
       }
 
       // Per requirements: tx_data must be a string (unsigned transaction hex)
-      // For UTXO_BASED: hex string
-      // For ACCOUNT_BASED: JSON string (stringified transaction object)
-      if (typeof tx_data !== 'string') {
+      // For UTXO_BASED: hex string. For ACCOUNT_BASED: JSON string.
+      // Skip when mnee_recipients is used (MNEE create-and-hold flow; no tx_data).
+      if (!useMneeTransfer && typeof tx_data !== 'string') {
         res.status(400).json({
           result: 'error',
           code: 'VALIDATION_ERROR',
@@ -685,15 +709,15 @@ export class MpcWalletController {
           return;
         }
       } else if (blockchain_type === 'UTXO_BASED') {
-        // For UTXO_BASED, utxos array is required
-        if (!Array.isArray(utxos) || utxos.length === 0) {
+        // For UTXO_BASED, utxos array is required unless using mnee_recipients (MNEE create-and-hold flow)
+        if (!useMneeTransfer && (!Array.isArray(utxos) || utxos.length === 0)) {
           res.status(400).json({
             result: 'error',
             code: 'VALIDATION_ERROR',
             msg: 'validation error',
             errors: [{
               code: 'REQUIRED_FIELD_MISSING_ERROR',
-              err_msg: 'utxos array is required for UTXO_BASED signing'
+              err_msg: 'utxos array is required for UTXO_BASED signing (or use mnee_recipients for MNEE)'
             }]
           });
           return;
@@ -737,12 +761,12 @@ export class MpcWalletController {
 
       // Validate coin type based on blockchain_type
       // Per requirement: "account id is invalid" error message
-      // Per requirement document: UTXO_BASED supports BSV (236/1) and BTC (0)
+      // Per requirement document: UTXO_BASED supports BSV (236/1) and BTC (0); BTC testnet (1) when BTCTESTNET=true
       if (blockchain_type === 'UTXO_BASED') {
         const expectedCoinType = isTestnet ? 1 : 236;
-        // Allow BSV coin types (1/236) and Bitcoin (0) for UTXO_BASED
-        // Per requirement: "like BSV, BTC.." (line 844)
-        const isValidUtxoCoinType = coinType === expectedCoinType || coinType === 0;
+        const btcTestnetEnabled = process.env.BTCTESTNET === 'true';
+        // Allow BSV coin types (1/236), Bitcoin mainnet (0), and optionally BTC testnet (1) when BTCTESTNET=true
+        const isValidUtxoCoinType = coinType === expectedCoinType || coinType === 0 || (coinType === 1 && btcTestnetEnabled);
         if (!isValidUtxoCoinType || Number.isNaN(accountIndex) || accountIndex < 0) {
           res.status(400).json({
             result: 'error',
@@ -876,9 +900,46 @@ export class MpcWalletController {
 
       // Handle UTXO_BASED blockchain transactions
       // All blockchain operations are in SDK - no direct @bsv/sdk usage in backend
-      // Determine if this is Bitcoin (coin type 0) or BSV (coin type 236/1)
-      const isBitcoin = coinType === 0;
-      
+      // Determine if this is Bitcoin (coin type 0 = mainnet, or coin type 1 = testnet when BTCTESTNET=true) or BSV (coin type 236/1)
+      const btcTestnetEnabled = process.env.BTCTESTNET === 'true';
+      const isBitcoin = coinType === 0 || (coinType === 1 && btcTestnetEnabled);
+
+      // MNEE create-and-hold: mnee.transfer(recipients, wif, { broadcast: false }) → return rawtx so client can broadcast later
+      if (useMneeTransfer && MneeClass) {
+        try {
+          const sdk = new BSVSDK({
+            isTestnet,
+            maxAddresses: 100000,
+            feeRate: network_fee
+          });
+          const fullPath = `${account_path.trim()}/0/0`;
+          const keypair = sdk.generateKeyPairAtPath(mnemonic, fullPath, 'p2pkh');
+          const wif = keypair.privateKey;
+          const mnee = new MneeClass({
+            environment: 'production',
+            ...(process.env.MNEE_API_KEY && { apiKey: process.env.MNEE_API_KEY })
+          });
+          const recipients = mnee_recipients.map((r: { address: string; amount: number }) => ({ address: String(r.address).trim(), amount: Number(r.amount) }));
+          const created = await mnee.transfer(recipients, wif, { broadcast: false });
+          const rawtx = (created && (created.rawtx ?? (created as any).rawTx)) ? String(created.rawtx ?? (created as any).rawTx).trim() : '';
+          if (!rawtx || rawtx.length < 20) {
+            throw new Error('MNEE transfer did not return raw tx (create-and-hold)');
+          }
+          res.status(200).json({
+            result: 'success',
+            code: 'RW_SUCCESS',
+            msg: 'transaction signed successfully',
+            data: { tx_id: tx_id.trim(), tx_data: rawtx, tx_type: 'MNEE' }
+          });
+          return;
+        } catch (mneeErr) {
+          console.error('MNEE create-and-hold failed:', mneeErr instanceof Error ? mneeErr.message : mneeErr);
+          throw new Error('MNEE transfer failed: ' + (mneeErr instanceof Error ? mneeErr.message : 'Unknown error'));
+        }
+      } else if (useMneeTransfer && !MneeClass) {
+        throw new Error('MNEE create-and-hold requires @mnee/ts-sdk');
+      }
+
       if (typeof tx_data !== 'string') {
         res.status(400).json({
           result: 'error',
@@ -959,28 +1020,123 @@ export class MpcWalletController {
         privateKeys.push(keypair.privateKey);
       }
 
+      // Bitcoin signing is offline: require script_pub_key_hex (and for P2PKH, previous_tx_hex) per UTXO
+      if (isBitcoin) {
+        for (let i = 0; i < utxos.length; i++) {
+          const utxo = utxos[i];
+          const scriptHex = typeof utxo.script_pub_key_hex === 'string' ? utxo.script_pub_key_hex.trim() : '';
+          if (!scriptHex) {
+            res.status(400).json({
+              result: 'error',
+              code: 'VALIDATION_ERROR',
+              msg: 'validation error',
+              errors: [{
+                code: 'INVALID_INPUT_ERROR',
+                err_msg: `Each utxo must include script_pub_key_hex for Bitcoin (offline signing). For legacy P2PKH inputs, also include previous_tx_hex (utxo ${i})`
+              }]
+            });
+            return;
+          }
+        }
+      }
+
+      // For UTXO_BASED BSV: optional tx_type (protocol) for non-native token support
+      let resolvedTxType: string = requestedTxType != null ? String(requestedTxType).trim() : '';
+      if (!isBitcoin && resolvedTxType !== '') {
+        if (!isAllowedProtocol(resolvedTxType)) {
+          res.status(400).json({
+            result: 'error',
+            code: 'VALIDATION_ERROR',
+            msg: 'validation error',
+            errors: [{
+              code: 'INVALID_INPUT_ERROR',
+              err_msg: 'tx_type must be one of: native, MNEE, 1Sat, MNEE-STAS, STAS, inscription, RUN, BCAT, paymail, covenant, custom'
+            }]
+          });
+          return;
+        }
+      }
+      if (!isBitcoin && resolvedTxType === '' && typeof tx_data === 'string' && tx_data.trim().length >= 20) {
+        try {
+          const detected = detectTxType(tx_data.trim());
+          if (detected.protocol !== 'native') resolvedTxType = detected.protocol;
+        } catch {
+          // keep resolvedTxType as '' (native)
+        }
+      }
+
+      // BSV non-native (MNEE, 1Sat, MNEE-STAS, STAS, inscription, RUN, BCAT, paymail, covenant, custom): require script_pub_key_hex per UTXO so signing uses the exact on-chain script (avoids "script validation failed" e.g. from MNEE V2). BTC path unchanged (bitcoinjs-lib).
+      if (!isBitcoin && resolvedTxType !== '' && resolvedTxType !== 'native') {
+        for (let i = 0; i < utxos.length; i++) {
+          const scriptHex = typeof utxos[i].script_pub_key_hex === 'string' ? utxos[i].script_pub_key_hex.trim() : '';
+          if (!scriptHex) {
+            res.status(400).json({
+              result: 'error',
+              code: 'VALIDATION_ERROR',
+              msg: 'validation error',
+              errors: [{
+                code: 'INVALID_INPUT_ERROR',
+                err_msg: `For BSV non-native (${resolvedTxType}) transactions, each utxo must include script_pub_key_hex (exact scriptPubKey of the spent output). Missing for utxo ${i}.`
+              }]
+            });
+            return;
+          }
+          // Only P2PKH and P2PK spendable outputs are supported for MNEE/1Sat/etc.; custom/covenant scripts are not.
+          try {
+            const lockingScript = LockingScript.fromHex(scriptHex);
+            const scriptType = getLockingScriptType(lockingScript);
+            if (scriptType === 'other') {
+              res.status(400).json({
+                result: 'error',
+                code: 'VALIDATION_ERROR',
+                msg: 'validation error',
+                errors: [{
+                  code: 'INVALID_INPUT_ERROR',
+                  err_msg: `For BSV non-native (${resolvedTxType}), script_pub_key_hex must be the exact scriptPubKey of the output being spent (P2PKH or P2PK owner output). UTXO ${i} has a custom/OP_RETURN script; use the spendable output's script, not the protocol data output.`
+                }]
+              });
+              return;
+            }
+          } catch {
+            res.status(400).json({
+              result: 'error',
+              code: 'VALIDATION_ERROR',
+              msg: 'validation error',
+              errors: [{
+                code: 'INVALID_INPUT_ERROR',
+                err_msg: `Invalid script_pub_key_hex for utxo ${i}: must be valid hex scriptPubKey (P2PKH or P2PK).`
+              }]
+            });
+            return;
+          }
+        }
+      }
+
       // Use SDK for transaction signing - all blockchain operations in SDK
       let signedHex: string;
       if (isBitcoin) {
-        // Bitcoin (BTC) - use SDK BitcoinTransactionSigner (real mainnet)
+        // Bitcoin (BTC) - use SDK BitcoinTransactionSigner; mainnet when coin type 0, testnet when coin type 1 (BTCTESTNET=true)
+        const bitcoinIsMainnet = coinType === 0;
         const bitcoinParams = {
           unsignedTxHex: tx_data.trim(),
           utxos: utxos.map(utxo => ({
             tx_hash: utxo.tx_hash.trim(),
             vout: utxo.vout,
             script_pub_key_hex: typeof utxo.script_pub_key_hex === 'string' ? utxo.script_pub_key_hex.trim() : '',
-            value: utxo.value
+            value: utxo.value,
+            previous_tx_hex: typeof (utxo as any).previous_tx_hex === 'string' ? (utxo as any).previous_tx_hex.trim() : undefined
           })),
           privateKeys,
-          isMainnet: !isTestnet, // Bitcoin mainnet (coin type 0 is always mainnet)
-          rpcUrl: process.env.BTC_RPC_URL // Optional custom BTC RPC URL
+          isMainnet: bitcoinIsMainnet
         };
 
         const bitcoinResult = await BitcoinTransactionSigner.signTransaction(bitcoinParams);
         signedHex = bitcoinResult.signedTransactionHex;
       } else {
         // BSV - use SDK BSVTransactionSigner (real mainnet/testnet, no mocks)
-        // All blockchain operations are in SDK - no direct @bsv/sdk usage
+        // Protocol-aware signing for MNEE, 1Sat, STAS, RUN, etc.; optional sighash for protocols that require it
+        const signOutputs = (signOutputsReq === 'none' || signOutputsReq === 'single') ? signOutputsReq : 'all';
+        const anyoneCanPay = anyoneCanPayReq === true;
         const bsvParams = {
           unsignedTxHex: tx_data.trim(),
           utxos: utxos.map(utxo => ({
@@ -991,21 +1147,49 @@ export class MpcWalletController {
           })),
           privateKeys,
           isTestnet,
-          rpcUrl: process.env.BSV_RPC_URL // Optional custom BSV RPC URL
+          rpcUrl: process.env.BSV_RPC_URL,
+          ...(signOutputs !== 'all' && { signOutputs }),
+          ...(anyoneCanPay && { anyoneCanPay })
         };
 
         const bsvResult = await BSVTransactionSigner.signTransaction(bsvParams);
         signedHex = bsvResult.signedTransactionHex;
+
+        // MNEE/1Sat pre-built tx: send user-signed tx to MNEE to add cosigner; return final raw tx so client can broadcast
+        if (resolvedTxType === 'MNEE' || resolvedTxType === '1Sat') {
+          if (MneeClass) {
+            try {
+              const mnee = new MneeClass({
+                environment: 'production',
+                ...(process.env.MNEE_API_KEY && { apiKey: process.env.MNEE_API_KEY })
+              });
+              const mneeResult = await mnee.submitRawTx(signedHex, { broadcast: false });
+              const finalHex = (mneeResult && (mneeResult.rawtx ?? mneeResult.rawTx)) ? String(mneeResult.rawtx ?? mneeResult.rawTx).trim() : '';
+              if (finalHex && finalHex.length >= 20) {
+                signedHex = finalHex;
+              } else {
+                throw new Error('MNEE API did not return cosigner-signed raw tx (response.rawtx missing or empty)');
+              }
+            } catch (mneeErr) {
+              console.error('MNEE cosigner step failed:', mneeErr instanceof Error ? mneeErr.message : mneeErr);
+              throw new Error('MNEE cosigner failed: ' + (mneeErr instanceof Error ? mneeErr.message : 'Unknown error'));
+            }
+          } else {
+            throw new Error('MNEE cosigner requires @mnee/ts-sdk for MNEE/1Sat transactions');
+          }
+        }
       }
 
+      const responseData: { tx_id: string; tx_data: string; tx_type?: string } = {
+        tx_id: tx_id.trim(),
+        tx_data: signedHex
+      };
+      if (!isBitcoin && resolvedTxType) responseData.tx_type = resolvedTxType;
       res.status(200).json({
         result: 'success',
         code: 'RW_SUCCESS',
         msg: 'transaction signed successfully',
-        data: {
-          tx_id: tx_id.trim(),
-          tx_data: signedHex
-        }
+        data: responseData
       });
     } catch (error) {
       console.error('MPC transaction signing error:', error);

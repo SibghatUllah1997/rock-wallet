@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { PrivateKey, P2PKH, Transaction as BsvTransaction } from '@bsv/sdk';
+import { PrivateKey, P2PKH, Transaction as BsvTransaction, LockingScript } from '@bsv/sdk';
 import { UTXOManager } from './utxo';
 
 export interface TransactionInput {
@@ -27,6 +27,21 @@ export interface BuiltTransaction {
   outputs: TransactionOutput[];
   fee: number;
   change: number;
+}
+
+export interface BuildTokenTransactionParams {
+  fromAddress: string;
+  toAddress: string;
+  tokenId: string;
+  amount: number;
+  privateKey: string;
+  isTestnet?: boolean;
+  feeRate?: number;
+  protocol?: string;
+}
+
+export interface BuiltTokenTransaction extends BuiltTransaction {
+  transaction: BsvTransaction;
 }
 
 /**
@@ -151,6 +166,110 @@ export class TransactionBuilder {
       inputs,
       outputs,
       fee: selection.fee,
+      change: change > 0 ? change : 0
+    };
+  }
+
+  /**
+   * Build a token transfer transaction (OP_RETURN-based; protocol-agnostic).
+   * Same UTXO flow as native; adds token data output.
+   */
+  static async buildTokenTransaction(params: BuildTokenTransactionParams): Promise<BuiltTokenTransaction> {
+    const {
+      fromAddress,
+      toAddress,
+      tokenId,
+      amount,
+      privateKey,
+      isTestnet = false,
+      feeRate = this.DEFAULT_FEE_RATE
+    } = params;
+    this.validateTransactionInputs(fromAddress, toAddress, amount > 0 ? amount : this.DUST_LIMIT);
+
+    const utxos = await UTXOManager.getUTXOs(fromAddress, isTestnet);
+    if (utxos.length === 0) {
+      throw new Error(`No UTXOs found for address ${fromAddress}`);
+    }
+
+    const feeEstimate = this.estimateFee(2, 3, feeRate);
+    const needAmount = this.DUST_LIMIT + feeEstimate + (amount > 0 ? amount : 0);
+    const selection = UTXOManager.selectOptimalUTXOs(utxos, needAmount, feeRate);
+
+    const inputs: TransactionInput[] = selection.selectedUtxos.map(utxo => ({
+      txid: utxo.txid,
+      vout: utxo.vout,
+      value: utxo.value ?? utxo.satoshis
+    }));
+
+    const totalInputValue = selection.selectedUtxos.reduce((sum, utxo) => sum + (utxo.value ?? utxo.satoshis), 0);
+    const fee = selection.fee;
+    const change = totalInputValue - this.DUST_LIMIT - fee - (amount > 0 ? amount : 0);
+
+    const wocBase = isTestnet ? 'https://api.whatsonchain.com/v1/bsv/test' : 'https://api.whatsonchain.com/v1/bsv/main';
+    const fetchPrevTxHex = async (txid: string): Promise<string> => {
+      const { data } = await axios.get(`${wocBase}/tx/${txid}/hex`, { timeout: 10000, responseType: 'text' });
+      return typeof data === 'string' ? data : String(data);
+    };
+
+    const priv = PrivateKey.fromWif(privateKey);
+    const nativeInputs: any[] = [];
+    for (const inp of inputs) {
+      const rawHex = await fetchPrevTxHex(inp.txid);
+      const sourceTx = BsvTransaction.fromHex(rawHex);
+      while (sourceTx.outputs.length <= inp.vout) {
+        sourceTx.outputs.push({
+          satoshis: 0,
+          lockingScript: new P2PKH().lock(fromAddress)
+        } as any);
+      }
+      sourceTx.outputs[inp.vout].satoshis = inp.value;
+      nativeInputs.push({
+        sourceTransaction: sourceTx,
+        sourceOutputIndex: inp.vout,
+        sourceSatoshis: inp.value,
+        sequence: 0xffffffff,
+        unlockingScriptTemplate: new P2PKH().unlock(priv)
+      });
+    }
+
+    const nativeOutputs: any[] = [];
+    nativeOutputs.push({ lockingScript: new P2PKH().lock(toAddress), satoshis: this.DUST_LIMIT });
+    let tokenIdPadded = Buffer.alloc(8);
+    try {
+      const tokenIdBuf = Buffer.from(tokenId, 'hex').slice(0, 8);
+      tokenIdBuf.copy(tokenIdPadded, 0);
+    } catch {
+      tokenIdPadded = Buffer.from(tokenId.padEnd(8, '\0').slice(0, 8), 'utf8');
+    }
+    const tokenData = Buffer.concat([
+      Buffer.from('SEN', 'utf8'),
+      tokenIdPadded,
+      Buffer.alloc(8)
+    ]);
+    tokenData.writeBigUInt64LE(BigInt(amount), 11);
+    const opReturnHex = '6a13' + tokenData.toString('hex');
+    const opReturnScript = LockingScript.fromHex(opReturnHex);
+    nativeOutputs.push({ lockingScript: opReturnScript, satoshis: 0 } as any);
+    if (change > 0) {
+      nativeOutputs.push({ lockingScript: new P2PKH().lock(fromAddress), satoshis: change });
+    }
+
+    const tx = new BsvTransaction(1, nativeInputs, nativeOutputs);
+    await tx.sign();
+
+    const transactionHex = tx.toHex();
+    const transactionId = String(tx.hash('hex'));
+
+    return {
+      transaction: tx,
+      transactionHex,
+      transactionId,
+      inputs,
+      outputs: [
+        { address: toAddress, value: this.DUST_LIMIT },
+        ...(change > 0 ? [{ address: fromAddress, value: change }] : [])
+      ],
+      fee,
       change: change > 0 ? change : 0
     };
   }

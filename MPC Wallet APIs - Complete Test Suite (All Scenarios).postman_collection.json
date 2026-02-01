@@ -2654,7 +2654,7 @@
       "name": "4. Sign Transaction",
       "item": [
         {
-          "name": "✅ Success - Sign Transaction (UTXO)",
+          "name": "✅ Success - Sign (BSV Native)",
           "event": [
             {
               "listen": "prerequest",
@@ -2805,6 +2805,133 @@
                 "transactions",
                 "sign"
               ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Success - Sign (BSV Non-Native - MNEE)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);",
+                  "if (!pm.environment.get('wallet_id') || !pm.environment.get('wallet_key')) {",
+                  "    console.log('⚠️ Run Create Wallet first');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has tx_data (cosigned)', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.data).to.have.property('tx_data');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{mpc_token}}", "type": "text"},
+              {"key": "X-RW-Device-ID", "value": "{{device_id}}", "type": "text"},
+              {"key": "X-RW-Client-ID", "value": "{{client_id}}", "type": "text"},
+              {"key": "X-RW-Request-ID", "value": "{{$randomUUID}}", "type": "text"},
+              {"key": "X-RW-Session-ID", "value": "{{session_id}}", "type": "text"},
+              {"key": "X-RW-Correlation-ID", "value": "{{$randomUUID}}", "type": "text"},
+              {"key": "X-RW-Forwarded-Proto", "value": "{{forwarded_proto}}", "type": "text"},
+              {"key": "X-RW-Forwarded-Port", "value": "{{forwarded_port}}", "type": "text"},
+              {"key": "X-Forwarded-For", "value": "{{forwarded_for}}", "type": "text"},
+              {"key": "User-Agent", "value": "{{user_agent}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"},
+              {"key": "Accept", "value": "application/json", "type": "text"},
+              {"key": "Date", "value": "{{date_header}}", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tx_id\": \"mnee-sign-1\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 5,\n    \"account_path\": \"m/44'/236'/0'\",\n    \"mnee_recipients\": [\n        {\"address\": \"17nrTWVw2sBtRmQ4rxYoenF9YWmsFZzyyZ\", \"amount\": 0.001}\n    ]\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": ["{{base_url}}"],
+              "path": ["rwcore", "api", "v1", "mpc", "wallets", "{{wallet_id}}", "transactions", "sign"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Success - Sign (BTC)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);",
+                  "if (!pm.environment.get('wallet_id') || !pm.environment.get('wallet_key')) {",
+                  "    console.log('⚠️ Run Create Wallet first');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has tx_id and tx_data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.data).to.have.property('tx_id');",
+                  "    pm.expect(jsonData.data).to.have.property('tx_data');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{mpc_token}}", "type": "text"},
+              {"key": "X-RW-Device-ID", "value": "{{device_id}}", "type": "text"},
+              {"key": "X-RW-Client-ID", "value": "{{client_id}}", "type": "text"},
+              {"key": "X-RW-Request-ID", "value": "{{$randomUUID}}", "type": "text"},
+              {"key": "X-RW-Session-ID", "value": "{{session_id}}", "type": "text"},
+              {"key": "X-RW-Correlation-ID", "value": "{{$randomUUID}}", "type": "text"},
+              {"key": "X-RW-Forwarded-Proto", "value": "{{forwarded_proto}}", "type": "text"},
+              {"key": "X-RW-Forwarded-Port", "value": "{{forwarded_port}}", "type": "text"},
+              {"key": "X-Forwarded-For", "value": "{{forwarded_for}}", "type": "text"},
+              {"key": "User-Agent", "value": "{{user_agent}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"},
+              {"key": "Accept", "value": "application/json", "type": "text"},
+              {"key": "Date", "value": "{{date_header}}", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tx_id\": \"{{tx_id}}\",\n    \"tx_data\": \"02000000000101...\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 1000,\n    \"account_path\": \"m/44'/0'/0'\",\n    \"utxos\": [\n        {\n            \"tx_hash\": \"...\",\n            \"vout\": 0,\n            \"script_pub_key_hex\": \"0014...\",\n            \"value\": 10000,\n            \"address_path\": \"0/0\",\n            \"previous_tx_hex\": \"...\"\n        }\n    ]\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": ["{{base_url}}"],
+              "path": ["rwcore", "api", "v1", "mpc", "wallets", "{{wallet_id}}", "transactions", "sign"]
             }
           },
           "response": []

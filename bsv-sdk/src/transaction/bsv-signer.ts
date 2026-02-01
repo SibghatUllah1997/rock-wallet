@@ -1,5 +1,64 @@
-import { PrivateKey, P2PKH, Transaction as BsvTransaction, LockingScript } from '@bsv/sdk';
+import {
+  PrivateKey,
+  P2PKH,
+  Transaction as BsvTransaction,
+  LockingScript,
+  UnlockingScript,
+  TransactionSignature,
+  Hash,
+  Script
+} from '@bsv/sdk';
 import axios from 'axios';
+import { getLockingScriptType, is1SatStyleScript, getEffectiveScriptFor1Sat, type LockingScriptType } from './protocols';
+
+/**
+ * Create P2PK (pay-to-pubkey) unlock template: unlocking script is [signature] only.
+ * Uses @bsv/sdk TransactionSignature and Hash for correct sighash (BSV/BCH fork).
+ */
+function createP2PKUnlockTemplate(
+  privateKey: PrivateKey,
+  signOutputs: SignOutputsScope,
+  anyoneCanPay: boolean,
+  sourceSatoshis: number,
+  lockingScript: Script
+): { sign: (tx: BsvTransaction, inputIndex: number) => Promise<UnlockingScript>; estimateLength: () => Promise<number> } {
+  let signatureScope = TransactionSignature.SIGHASH_FORKID;
+  if (signOutputs === 'all') signatureScope |= TransactionSignature.SIGHASH_ALL;
+  if (signOutputs === 'none') signatureScope |= TransactionSignature.SIGHASH_NONE;
+  if (signOutputs === 'single') signatureScope |= TransactionSignature.SIGHASH_SINGLE;
+  if (anyoneCanPay) signatureScope |= TransactionSignature.SIGHASH_ANYONECANPAY;
+
+  return {
+    sign: async (tx: BsvTransaction, inputIndex: number) => {
+      const input = tx.inputs[inputIndex];
+      const otherInputs = tx.inputs.filter((_, index) => index !== inputIndex);
+      const sourceTXID = input.sourceTXID ?? (input as any).sourceTransaction?.id?.('hex');
+      if (sourceTXID == null || sourceTXID === '') {
+        throw new Error('The input sourceTXID or sourceTransaction is required for transaction signing.');
+      }
+      const preimage = TransactionSignature.format({
+        sourceTXID,
+        sourceOutputIndex: input.sourceOutputIndex!,
+        sourceSatoshis,
+        transactionVersion: tx.version,
+        otherInputs,
+        inputIndex,
+        outputs: tx.outputs,
+        inputSequence: input.sequence ?? 0xffffffff,
+        subscript: lockingScript,
+        lockTime: tx.lockTime,
+        scope: signatureScope
+      });
+      const rawSignature = privateKey.sign(Hash.sha256(preimage));
+      const sig = new TransactionSignature(rawSignature.r, rawSignature.s, signatureScope);
+      const sigForScript = sig.toChecksigFormat();
+      return new UnlockingScript([{ op: sigForScript.length, data: sigForScript }]);
+    },
+    estimateLength: async () => 73 + 1
+  };
+}
+
+export type SignOutputsScope = 'all' | 'none' | 'single';
 
 export interface BSVTransactionParams {
   unsignedTxHex: string;
@@ -12,6 +71,9 @@ export interface BSVTransactionParams {
   privateKeys: string[]; // WIF format private keys for each UTXO
   isTestnet?: boolean;
   rpcUrl?: string;
+  /** Optional: per-input or global sighash. MNEE/1Sat/STAS/RUN may require 'single' or anyoneCanPay in some flows. */
+  signOutputs?: SignOutputsScope;
+  anyoneCanPay?: boolean;
 }
 
 export interface BSVSigningResult {
@@ -86,6 +148,13 @@ export class BSVTransactionSigner {
         throw new Error(`Invalid unsigned transaction hex: ${errorMsg}`);
       }
 
+      // Snapshot output amounts and locking scripts so we never change them. Signing must not modify
+      // outputs (signatures are over the exact outputs); restore after sign() to guarantee validity.
+      const outputSnapshot: Array<{ satoshis: number; lockingScript: LockingScript }> = (transaction.outputs || []).map((o) => ({
+        satoshis: typeof o.satoshis === 'number' ? o.satoshis : 0,
+        lockingScript: o.lockingScript
+      }));
+
       // Validate UTXOs match transaction inputs
       if (transaction.inputs.length !== params.utxos.length) {
         throw new Error(`UTXOs count (${params.utxos.length}) must match transaction inputs count (${transaction.inputs.length})`);
@@ -125,6 +194,8 @@ export class BSVTransactionSigner {
               lockingScript
             };
             sourceTransaction.outputs = outputs as any;
+            // Critical: synthetic tx's id() would be wrong. Sighash preimage must use the REAL previous txid.
+            // We set sourceTXID below so P2PKH.unlock() uses it instead of sourceTransaction.id('hex').
           } catch (scriptError) {
             // Fallback to fetching from network
             try {
@@ -146,13 +217,51 @@ export class BSVTransactionSigner {
         input.sourceOutputIndex = utxo.vout;
         input.sourceSatoshis = utxo.value;
         input.sequence = input.sequence ?? 0xffffffff;
+        // When we built a synthetic sourceTransaction (from script_pub_key_hex), its id() is wrong.
+        // Sighash preimage must use the real previous txid. Set sourceTXID so unlock template uses it.
+        if (utxo.script_pub_key_hex && utxo.tx_hash) {
+          input.sourceTXID = utxo.tx_hash.trim();
+        }
 
-        // Set unlocking script template
-        input.unlockingScriptTemplate = new P2PKH().unlock(privateKey);
+        // Locking script of the output we're spending (required for correct scriptCode in sighash; MNEE/1Sat/STAS/RUN compatible)
+        const lockingScript = (sourceTransaction.outputs && sourceTransaction.outputs[utxo.vout])
+          ? sourceTransaction.outputs[utxo.vout].lockingScript
+          : LockingScript.fromHex(utxo.script_pub_key_hex!.trim());
+        const sourceSatoshis = utxo.value;
+        const scriptType: LockingScriptType = getLockingScriptType(lockingScript);
+        const signOutputs: SignOutputsScope = params.signOutputs ?? 'all';
+        const anyoneCanPay = params.anyoneCanPay ?? false;
+
+        // For 1Sat-style (OP_FALSE OP_IF ... OP_ENDIF <spendable>), the node uses only the part after
+        // OP_ENDIF as scriptCode when verifying; use that same part for sighash or verification fails / stack errors.
+        const effective1Sat = is1SatStyleScript(lockingScript) ? getEffectiveScriptFor1Sat(lockingScript) : null;
+        const scriptForSighash = effective1Sat ?? lockingScript;
+
+        if (scriptType === 'p2pk') {
+          input.unlockingScriptTemplate = createP2PKUnlockTemplate(privateKey, signOutputs, anyoneCanPay, sourceSatoshis, scriptForSighash);
+        } else {
+          input.unlockingScriptTemplate = new P2PKH().unlock(privateKey, signOutputs, anyoneCanPay, sourceSatoshis, scriptForSighash);
+        }
       }
 
-      // Sign the transaction
+      // Restore outputs from snapshot before sign() so the sighash preimage uses the exact amounts from the unsigned tx.
+      if (transaction.outputs && outputSnapshot.length === transaction.outputs.length) {
+        for (let j = 0; j < outputSnapshot.length; j++) {
+          (transaction.outputs[j] as any).satoshis = outputSnapshot[j].satoshis;
+          (transaction.outputs[j] as any).lockingScript = outputSnapshot[j].lockingScript;
+        }
+      }
+
+      // Sign the transaction (signatures are over the restored outputs)
       await transaction.sign();
+
+      // Restore again after sign() in case the SDK or any callback mutated outputs; serialization must match what was signed.
+      if (transaction.outputs && outputSnapshot.length === transaction.outputs.length) {
+        for (let j = 0; j < outputSnapshot.length; j++) {
+          (transaction.outputs[j] as any).satoshis = outputSnapshot[j].satoshis;
+          (transaction.outputs[j] as any).lockingScript = outputSnapshot[j].lockingScript;
+        }
+      }
 
       const signedHex = transaction.toHex();
       const txId = String(transaction.hash('hex'));

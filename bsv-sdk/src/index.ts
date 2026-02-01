@@ -11,6 +11,7 @@ import { TransactionSigner, SigningResult, BroadcastResult } from './transaction
 import { EthereumTransactionSigner, EthereumTransactionRequest, EthereumSigningResult } from './transaction/ethereum';
 import { BitcoinTransactionSigner, BitcoinTransactionParams, BitcoinSigningResult } from './transaction/bitcoin';
 import { BSVTransactionSigner, BSVTransactionParams, BSVSigningResult } from './transaction/bsv-signer';
+import { detectTxType, isAllowedProtocol, getLockingScriptType, PROTOCOL_NAMES, type TxProtocol, type DetectResult } from './transaction/protocols';
 import { BalanceManager, NativeBalance, BalanceValidation } from './transaction/balance';
 import { BSVNetworkAPI, NetworkConfig, BlockInfo, TransactionInfo } from './network/api';
 import { RockWalletClient, RockWalletConfig } from './network/rockwallet';
@@ -819,7 +820,11 @@ export {
   BalanceManager,
   BSVNetworkAPI,
   BSVMultiBroadcastClient,
-  BSVNodeClient
+  BSVNodeClient,
+  detectTxType,
+  isAllowedProtocol,
+  getLockingScriptType,
+  PROTOCOL_NAMES
 };
 
 // Export types
@@ -849,5 +854,7 @@ export type {
   BalanceValidation,
   NetworkConfig,
   BlockInfo,
-  TransactionInfo
+  TransactionInfo,
+  TxProtocol,
+  DetectResult
 };

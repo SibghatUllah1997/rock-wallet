@@ -1,0 +1,23 @@
+{
+  "name": "mpc-rockwallet-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MPC Rockwallet monorepo: backend API and BSV SDK",
+  "workspaces": [
+    "backend-service",
+    "bsv-sdk"
+  ],
+  "scripts": {
+    "build": "npm run build -w @rockwallet/bsv-sdk && npm run build -w bsv-wallet-backend-service",
+    "start": "npm run start -w bsv-wallet-backend-service",
+    "dev": "npm run dev -w bsv-wallet-backend-service",
+    "test": "npm run test -w @rockwallet/bsv-sdk && npm run test -w bsv-wallet-backend-service",
+    "test:sdk": "npm run test -w @rockwallet/bsv-sdk",
+    "test:backend": "npm run test -w bsv-wallet-backend-service"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Rockwallet Labs",
+  "license": "ISC"
+}

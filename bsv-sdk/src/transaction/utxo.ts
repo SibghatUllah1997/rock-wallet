@@ -338,7 +338,7 @@ export class UTXOManager {
         vout: utxo.tx_pos !== undefined ? utxo.tx_pos : utxo.vout,
         satoshis: utxo.value || utxo.satoshis,
         value: utxo.value || utxo.satoshis, // Alias for compatibility
-        script: utxo.script || utxo.scriptPubKey || '',
+        script: utxo.script || utxo.scriptPubKey || utxo.hex || '',
         address: address,
         height: utxo.height,
         confirmations: utxo.confirmations,

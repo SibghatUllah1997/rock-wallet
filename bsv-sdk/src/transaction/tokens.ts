@@ -1,5 +1,4 @@
-import * as bitcoin from 'bitcoinjs-lib';
-import { UTXOManager } from './utxo';
+import { Transaction as BsvTransaction, LockingScript, OP } from '@bsv/sdk';
 import { TransactionBuilder } from './builder';
 
 export interface TokenInfo {
@@ -66,9 +65,10 @@ export class TokenManager {
         if (!hexRes.ok) continue;
         const hex = (await hexRes.text()).replace(/\"/g, '').trim();
         try {
-          const tx = bitcoin.Transaction.fromHex(hex);
-          for (const out of tx.outs) {
-            const parsed = this.parseTokenData(out.script as Buffer);
+          const tx = BsvTransaction.fromHex(hex);
+          const outputs = tx.outputs || [];
+          for (const out of outputs) {
+            const parsed = out.lockingScript ? this.parseTokenData(out.lockingScript) : null;
             if (parsed && parsed.tokenId === tokenId && parsed.toAddress === address && typeof parsed.amount === 'number') {
               balanceRaw += parsed.amount;
             }
@@ -113,9 +113,10 @@ export class TokenManager {
         if (!hexRes.ok) continue;
         const hex = (await hexRes.text()).replace(/\"/g, '').trim();
         try {
-          const tx = bitcoin.Transaction.fromHex(hex);
-          for (const out of tx.outs) {
-            const parsed = this.parseTokenData(out.script as Buffer);
+          const tx = BsvTransaction.fromHex(hex);
+          const outputs = tx.outputs || [];
+          for (const out of outputs) {
+            const parsed = out.lockingScript ? this.parseTokenData(out.lockingScript) : null;
             if (parsed && parsed.toAddress === address && parsed.tokenId && typeof parsed.amount === 'number') {
               totals.set(parsed.tokenId, (totals.get(parsed.tokenId) || 0) + parsed.amount);
             }
@@ -264,7 +265,7 @@ export class TokenManager {
         feeRate
       });
 
-      const transactionId = builtTransaction.transaction.getId();
+      const transactionId = builtTransaction.transactionId;
 
       return {
         fromAddress,
@@ -279,27 +280,30 @@ export class TokenManager {
   }
 
   /**
-   * Parse token data from OP_RETURN script
-   * @param script - OP_RETURN script
+   * Parse token data from OP_RETURN locking script (@bsv/sdk only).
+   * @param lockingScript - Output locking script (OP_RETURN)
    * @returns Parsed token data
    */
-  static parseTokenData(script: Buffer): {
+  static parseTokenData(lockingScript: LockingScript): {
     protocol: string;
     tokenId?: string;
     amount?: number;
     toAddress?: string;
   } | null {
     try {
-      // Parse OP_RETURN script for token data
-      const scriptChunks = bitcoin.script.decompile(script);
-      if (!scriptChunks || scriptChunks.length < 2) {
+      const chunks = lockingScript.chunks;
+      if (!chunks || chunks.length < 2) {
         return null;
       }
-
-      const opReturnData = scriptChunks[1] as Buffer;
-      if (!opReturnData || opReturnData.length < 3) {
+      if (chunks[0].op !== OP.OP_RETURN) {
         return null;
       }
+      const dataChunk = chunks[1];
+      const opReturnDataArr = dataChunk?.data;
+      if (!opReturnDataArr || opReturnDataArr.length < 3) {
+        return null;
+      }
+      const opReturnData = Buffer.from(opReturnDataArr);
 
       // Check protocol identifier
       const protocol = opReturnData.slice(0, 3).toString('utf8');
@@ -405,17 +409,16 @@ export class TokenManager {
     feeRate: number = this.DEFAULT_FEE_RATE
   ): Promise<string> {
     try {
-      // Create Metanet OP_RETURN script
+      // Create Metanet OP_RETURN script using @bsv/sdk only
       const metanetData = Buffer.concat([
         Buffer.from(this.METANET_PROTOCOL_ID, 'utf8'),
         Buffer.from(nodeId, 'hex'),
         Buffer.from(parentTxId, 'hex'),
         Buffer.from(data, 'utf8')
       ]);
-
-      const metanetScript = bitcoin.script.compile([
-        bitcoin.opcodes.OP_RETURN,
-        metanetData
+      const metanetScript = new LockingScript([
+        { op: OP.OP_RETURN },
+        { op: metanetData.length, data: Array.from(metanetData) }
       ]);
 
       // Build transaction with Metanet output
@@ -429,7 +432,7 @@ export class TokenManager {
         feeRate
       });
 
-      return builtTransaction.transaction.toHex();
+      return builtTransaction.transactionHex;
     } catch (error) {
       throw new Error(`Failed to create Metanet node: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
