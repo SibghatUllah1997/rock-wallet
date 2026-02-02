@@ -213,48 +213,48 @@ const jwksClient = new JwksClient(authMeClient);
 const jwtService = new JwtVerificationService(jwksClient, process.env.JWT_EXPECTED_ISSUER || "");
 
 export async function jwtAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  // const authHeader = req.headers.authorization;
-  // if (!authHeader || !authHeader.startsWith("Bearer ")) {
-  //   return res.status(401).json({ message: "Unauthorized" });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const token = authHeader.substring("Bearer ".length);
+  const result = await jwtService.verifyToken(token);
+
+
+  const tokenSessionId = result.data?.sessionId;
+  const tokenClientId = result.data?.clientId;
+  const headerSessionId = req.headers['x-rw-session-id'] as string || req.body.session_id as string;
+  const headerClientId = req.headers['x-rw-client-id'] as string || req.body.client_id as string;
+
+  console.log('tokenSessionId:', tokenSessionId);
+  console.log('tokenClientId:', tokenClientId);
+  console.log('headerSessionId:', headerSessionId);
+  console.log('headerClientId:', headerClientId);
+  console.log('req.headers:', req.headers);
+
+  // Validate session ID
+  if (!headerSessionId) {
+    return res.status(400).json({ message: "Missing session ID in request" });
+  }
+  // if (tokenSessionId != headerSessionId) {
+  //   return res.status(401).json({ message: "Session ID mismatch" });
   // }
 
-  // const token = authHeader.substring("Bearer ".length);
-  // const result = await jwtService.verifyToken(token);
+  // Validate client ID
+  if (!headerClientId) {
+    return res.status(400).json({ message: "Missing client ID in request" });
+  }
+  if (tokenClientId != headerClientId) {
+    return res.status(401).json({ message: "Client ID mismatch" });
+  }
 
+  console.log(" result", result)
 
-  // const tokenSessionId = result.data?.sessionId;
-  // const tokenClientId = result.data?.clientId;
-  // const headerSessionId = req.headers['x-rw-session-id'] as string || req.body.session_id as string;
-  // const headerClientId = req.headers['x-rw-client-id'] as string || req.body.client_id as string;
+  if (!result.valid) {
+    return res.status(401).json({ message: result.error });
+  }
 
-  // console.log('tokenSessionId:', tokenSessionId);
-  // console.log('tokenClientId:', tokenClientId);
-  // console.log('headerSessionId:', headerSessionId);
-  // console.log('headerClientId:', headerClientId);
-  // console.log('req.headers:', req.headers);
-
-  // // Validate session ID
-  // if (!headerSessionId) {
-  //   return res.status(400).json({ message: "Missing session ID in request" });
-  // }
-  // // if (tokenSessionId != headerSessionId) {
-  // //   return res.status(401).json({ message: "Session ID mismatch" });
-  // // }
-
-  // // Validate client ID
-  // if (!headerClientId) {
-  //   return res.status(400).json({ message: "Missing client ID in request" });
-  // }
-  // if (tokenClientId != headerClientId) {
-  //   return res.status(401).json({ message: "Client ID mismatch" });
-  // }
-
-  // console.log(" result", result)
-
-  // if (!result.valid) {
-  //   return res.status(401).json({ message: result.error });
-  // }
-
-  // (req as any).user = result.data;
+  (req as any).user = result.data;
   next();
 }

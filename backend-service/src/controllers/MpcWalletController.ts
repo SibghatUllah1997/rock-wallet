@@ -114,7 +114,8 @@ export class MpcWalletController {
         data: {
           wallet_id: wallet_id.trim(),
           wallet_key: walletData.shard3,
-          xpub: walletData.xpub
+          xpub: walletData.xpub,
+          xpub_hash: xpubHash
         }
       });
     } catch (error) {
@@ -196,11 +197,16 @@ export class MpcWalletController {
         return;
       }
 
-      if (!wallet.xpubHash && wallet.xpub) {
-        wallet.xpubHash = crypto.createHash('sha256').update(wallet.xpub).digest('hex');
-      }
+      // Use stored xpubHash or compute from xpub (legacy wallets may not have xpubHash)
+      const storedHash = (wallet.xpubHash || '').trim().toLowerCase();
+      const computedFromXpub = wallet.xpub
+        ? crypto.createHash('sha256').update(wallet.xpub).digest('hex').toLowerCase()
+        : '';
+      const isValidHash =
+        (storedHash && storedHash === normalizedXpubHash) ||
+        (computedFromXpub && computedFromXpub === normalizedXpubHash);
 
-      if (!wallet.xpubHash || wallet.xpubHash !== normalizedXpubHash) {
+      if (!isValidHash) {
         res.status(400).json({
           result: 'error',
           code: 'VALIDATION_ERROR',

@@ -2783,7 +2783,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"tx_id\": \"{{tx_id}}\",\n    \"tx_data\": \"0200000002cd7b455fc5d79ecb9088f1428c9591e853a2d29305dfc5518f1c098f6a1bd7320000000000ffffffffbe1f881f9648119e15e26b96001ff66ff9660277b6420518f0d321752826aba30000000000ffffffff0240420f00000000001976a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888acb48e1400000000001976a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888ac00000000\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 1000,\n    \"account_path\": \"{{account_path}}\",\n    \"utxos\": [\n      {\n      \"tx_hash\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"vout\": 0,\n      \"script_pub_key_hex\": \"76a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba88ac\",\n      \"value\": 23151167,\n      \"address_path\": \"0/0\"\n    }\n    ]\n}",
+              "raw": "{\n    \"tx_id\": \"{{tx_id}}\",\n    \"tx_data\": \"0200000002cd7b455fc5d79ecb9088f1428c9591e853a2d29305dfc5518f1c098f6a1bd7320000000000ffffffffbe1f881f9648119e15e26b96001ff66ff9660277b6420518f0d321752826aba30000000000ffffffff0240420f00000000001976a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888acb48e1400000000001976a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888ac00000000\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 1000,\n    \"account_path\": \"m/44'/236'/0'\",\n    \"utxos\": [\n      {\n        \"tx_hash\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n        \"vout\": 0,\n        \"script_pub_key_hex\": \"76a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba88ac\",\n        \"value\": 23151167,\n        \"address_path\": \"0/0\"\n      }\n    ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2805,12 +2805,13 @@
                 "transactions",
                 "sign"
               ]
-            }
+            },
+            "description": "BSV native P2PKH. Requires: tx_data (unsigned hex), utxos (tx_hash, vout, script_pub_key_hex, value, address_path). account_path m/44'/236'/0' (mainnet) or m/44'/1'/0' (testnet). Replace tx_data/utxos with real payload from builder or scripts."
           },
           "response": []
         },
         {
-          "name": "✅ Success - Sign (BSV Non-Native - MNEE)",
+          "name": "✅ Success - Sign (BSV MNEE)",
           "event": [
             {
               "listen": "prerequest",
@@ -2868,12 +2869,13 @@
               "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
               "host": ["{{base_url}}"],
               "path": ["rwcore", "api", "v1", "mpc", "wallets", "{{wallet_id}}", "transactions", "sign"]
-            }
+            },
+            "description": "BSV MNEE cosigned flow. No tx_data/utxos. Backend calls mnee.transfer(mnee_recipients, wif, { broadcast: false }) and returns cosigned tx_data. account_path m/44'/236'/0' (BSV). Set wallet_key from Create Wallet."
           },
           "response": []
         },
         {
-          "name": "✅ Success - Sign (BTC)",
+          "name": "✅ Success - Sign (BTC SegWit)",
           "event": [
             {
               "listen": "prerequest",
@@ -2925,14 +2927,80 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"tx_id\": \"{{tx_id}}\",\n    \"tx_data\": \"02000000000101...\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 1000,\n    \"account_path\": \"m/44'/0'/0'\",\n    \"utxos\": [\n        {\n            \"tx_hash\": \"...\",\n            \"vout\": 0,\n            \"script_pub_key_hex\": \"0014...\",\n            \"value\": 10000,\n            \"address_path\": \"0/0\",\n            \"previous_tx_hex\": \"...\"\n        }\n    ]\n}",
+              "raw": "{\n    \"tx_id\": \"{{tx_id}}\",\n    \"tx_data\": \"02000000000101aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000000000fdffffff0110270000000000001976a91495d9c58c6e516506b6fc7c86c2a52e026b93d9eb88ac00000000\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 500,\n    \"account_path\": \"m/44'/1'/0'\",\n    \"utxos\": [\n        {\n            \"tx_hash\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n            \"vout\": 0,\n            \"script_pub_key_hex\": \"001482b3089aa6d2de53234349a8b22472b8a649af8f\",\n            \"value\": 10000,\n            \"address_path\": \"0/0\"\n        }\n    ]\n}",
               "options": {"raw": {"language": "json"}}
             },
             "url": {
               "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
               "host": ["{{base_url}}"],
               "path": ["rwcore", "api", "v1", "mpc", "wallets", "{{wallet_id}}", "transactions", "sign"]
+            },
+            "description": "BTC SegWit (P2WPKH). account_path m/44'/1'/0' (testnet) or m/44'/0'/0' (mainnet). utxos: script_pub_key_hex = P2WPKH (0014<20 bytes>), no previous_tx_hex. Replace tx_data/utxos with real payload (e.g. build-btc-real-payloads.js with SEGWIT_ADDRESS)."
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Success - Sign (BTC Legacy)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const date = new Date().toUTCString();",
+                  "pm.environment.set('date_header', date);",
+                  "if (!pm.environment.get('wallet_id') || !pm.environment.get('wallet_key')) {",
+                  "    console.log('⚠️ Run Create Wallet first');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has tx_id and tx_data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result).to.eql('success');",
+                  "    pm.expect(jsonData.data).to.have.property('tx_id');",
+                  "    pm.expect(jsonData.data).to.have.property('tx_data');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
             }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{mpc_token}}", "type": "text"},
+              {"key": "X-RW-Device-ID", "value": "{{device_id}}", "type": "text"},
+              {"key": "X-RW-Client-ID", "value": "{{client_id}}", "type": "text"},
+              {"key": "X-RW-Request-ID", "value": "{{$randomUUID}}", "type": "text"},
+              {"key": "X-RW-Session-ID", "value": "{{session_id}}", "type": "text"},
+              {"key": "X-RW-Correlation-ID", "value": "{{$randomUUID}}", "type": "text"},
+              {"key": "X-RW-Forwarded-Proto", "value": "{{forwarded_proto}}", "type": "text"},
+              {"key": "X-RW-Forwarded-Port", "value": "{{forwarded_port}}", "type": "text"},
+              {"key": "X-Forwarded-For", "value": "{{forwarded_for}}", "type": "text"},
+              {"key": "User-Agent", "value": "{{user_agent}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"},
+              {"key": "Accept", "value": "application/json", "type": "text"},
+              {"key": "Date", "value": "{{date_header}}", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tx_id\": \"{{tx_id}}\",\n    \"tx_data\": \"0100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000000000fdffffff02e8030000000000001976a91495d9c58c6e516506b6fc7c86c2a52e026b93d9eb88ac581b0000000000001976a91482b3089aa6d2de53234349a8b22472b8a649af8f88ac00000000\",\n    \"wallet_key\": \"{{wallet_key}}\",\n    \"blockchain_type\": \"UTXO_BASED\",\n    \"network_fee\": 500,\n    \"account_path\": \"m/44'/1'/0'\",\n    \"utxos\": [\n        {\n            \"tx_hash\": \"57923edbb1d89698b03c3ef04f67b635ef46370a1f36439e35900977b6d43ed9\",\n            \"vout\": 1,\n            \"script_pub_key_hex\": \"76a91482b3089aa6d2de53234349a8b22472b8a649af8f88ac\",\n            \"value\": 8500,\n            \"address_path\": \"0/0\",\n            \"previous_tx_hex\": \"020000000128ceff04ca49df1bccf0d2d08ea10c8418261e23dbb8e40a21641d69b4c3a77b000000006a4730440220020bdf0669601e86f0b949cedab3c808e2a3962aa0f3d8daafb09c28e167996502207243226ad172f4419223c4f79783ed3200d791c2920fa5b0cd35655660cc4550012102f8dd285bf79fcd7e3fff0bce42b39ff8e4050da6ae8abad1812391ba3330e404ffffffff02e8030000000000001976a91495d9c58c6e516506b6fc7c86c2a52e026b93d9eb88ac34210000000000001976a91482b3089aa6d2de53234349a8b22472b8a649af8f88ac00000000\"\n        }\n    ]\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{base_url}}/rwcore/api/v1/mpc/wallets/{{wallet_id}}/transactions/sign",
+              "host": ["{{base_url}}"],
+              "path": ["rwcore", "api", "v1", "mpc", "wallets", "{{wallet_id}}", "transactions", "sign"]
+            },
+            "description": "BTC Legacy (P2PKH). account_path m/44'/1'/0' (testnet) or m/44'/0'/0' (mainnet). utxos: script_pub_key_hex = P2PKH (76a914...88ac), previous_tx_hex required. Replace tx_data/utxos with real payload (e.g. build-btc-real-payloads.js with LEGACY_ADDRESS)."
           },
           "response": []
         },
@@ -4455,7 +4523,7 @@
           "response": []
         }
       ],
-      "description": "Sign transaction endpoint"
+      "description": "Sign transaction endpoint. Success scenarios: BSV Native (tx_data + utxos), BSV MNEE (mnee_recipients), BTC SegWit (P2WPKH, no previous_tx_hex), BTC Legacy (P2PKH + previous_tx_hex)."
     }
   ],
   "event": [
